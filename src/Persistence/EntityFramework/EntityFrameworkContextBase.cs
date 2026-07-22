@@ -83,20 +83,9 @@ internal class EntityFrameworkContextBase : IContext
             acceptChanges = false;
         }
 
-        var addedGameConfiguration = this.Context.ChangeTracker.Entries<GameConfiguration>().Any(entry => entry.State == EntityState.Added);
-        if (addedGameConfiguration)
-        {
-            this.LogDuelExitState("before save");
-        }
-
         try
         {
             await this.Context.SaveChangesAsync(acceptChanges, cancellationToken).ConfigureAwait(false);
-
-            if (addedGameConfiguration)
-            {
-                this.LogDuelExitState("after save");
-            }
 
             if (args is not null)
             {
@@ -115,23 +104,6 @@ internal class EntityFrameworkContextBase : IContext
             sender = s;
             args = e;
         }
-    }
-
-    private void LogDuelExitState(string phase)
-    {
-        var duelEntry = this.Context.ChangeTracker.Entries<DuelConfiguration>()
-            .FirstOrDefault(entry => entry.State != EntityState.Unchanged);
-        var exit = duelEntry?.Entity.Exit;
-        var exitEntry = exit is null ? null : this.Context.Entry(exit);
-        this._logger.LogInformation(
-            "Game configuration clone duel exit {Phase}: Duel {DuelId} is {DuelState}; ExitGate {ExitId} is {ExitState}, Map {MapId}, contained by map: {ContainedByMap}.",
-            phase,
-            duelEntry?.Entity.GetId(),
-            duelEntry?.State,
-            exit?.GetId(),
-            exitEntry?.State,
-            exit?.Map?.GetId(),
-            exit?.Map?.ExitGates.Contains(exit) ?? false);
     }
 
     /// <inheritdoc/>

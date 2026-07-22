@@ -29,6 +29,7 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
 
     private Task? _loadTask;
     private CancellationTokenSource? _disposeCts;
+    private Guid? _duplicatingId;
 
     private List<ViewModel>? _viewModels;
 
@@ -284,11 +285,20 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
 
     private async Task OnDuplicateButtonClickAsync(ViewModel viewModel)
     {
+        if (this._duplicatingId is not null)
+        {
+            return;
+        }
+
+        this._duplicatingId = viewModel.Id;
+        using var loading = this.LoadingService.ShowLoadingIndicator();
         try
         {
             var cancellationToken = this._disposeCts?.Token ?? default;
             var gameConfiguration = await this.DataSource.GetOwnerAsync(this.GameConfigurationId, cancellationToken).ConfigureAwait(false);
-            var context = this.PersistenceContextProvider.CreateNewTypedContext(this.Type!, true, gameConfiguration);
+            var context = this.Type == typeof(GameConfiguration)
+                ? this.PersistenceContextProvider.CreateNewContext(gameConfiguration)
+                : this.PersistenceContextProvider.CreateNewTypedContext(this.Type!, true, gameConfiguration);
             try
             {
                 var original = await context.GetByIdAsync(viewModel.Id, this.Type!, cancellationToken).ConfigureAwait(false);
@@ -346,6 +356,11 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
         {
             this.Logger.LogError(ex, "Error duplicating {viewModelName}.", viewModel.Name);
             this.ToastService.ShowError(string.Format(Resources.ErrorDuplicating, viewModel.Name, ex.Message));
+        }
+        finally
+        {
+            this._duplicatingId = null;
+            await this.InvokeAsync(this.StateHasChanged).ConfigureAwait(false);
         }
     }
 
