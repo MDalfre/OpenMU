@@ -28,7 +28,7 @@ public class VipServerAccessPlugInTests
         await CreatePlugIn().ValidateAccountLoginAsync(player, eventArgs).ConfigureAwait(false);
 
         Assert.That(eventArgs.Cancel, Is.True);
-        Assert.That(eventArgs.RejectionResult, Is.EqualTo(LoginResult.NoChargeInfo));
+        Assert.That(eventArgs.RejectionResult, Is.EqualTo(LoginResult.ChargedChannel));
     }
 
     [Test]

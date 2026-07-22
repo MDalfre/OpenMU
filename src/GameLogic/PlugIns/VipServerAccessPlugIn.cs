@@ -44,7 +44,7 @@ public class VipServerAccessPlugIn : IAccountLoginValidationPlugIn, ISupportCust
             gameServerContext.Id,
             vipLevel,
             configuration.MinimumVipLevel);
-        eventArgs.RejectionResult = LoginResult.NoChargeInfo;
+        eventArgs.RejectionResult = LoginResult.ChargedChannel;
         eventArgs.Cancel = true;
         return ValueTask.CompletedTask;
     }

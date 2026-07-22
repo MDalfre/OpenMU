@@ -61,6 +61,11 @@ public enum LoginResult : byte
     NoChargeInfo = 9,
 
     /// <summary>
+    /// The account is not allowed to enter a charged channel.
+    /// </summary>
+    ChargedChannel = 0x40,
+
+    /// <summary>
     /// Subscription term is over.
     /// </summary>
     SubscriptionTermOver = 10,
