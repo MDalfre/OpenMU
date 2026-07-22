@@ -13,7 +13,8 @@ public class VipServerAccessPlugInConfiguration
     /// <summary>
     /// Gets or sets the game server IDs which require VIP access.
     /// </summary>
-    public byte[] RestrictedServerIds { get; set; } = [3, 4];
+    [Display(Name = "Restricted Server IDs")]
+    public IList<int> RestrictedServers { get; set; } = [3, 4];
 
     /// <summary>
     /// Gets or sets a value indicating whether game masters bypass the restriction.

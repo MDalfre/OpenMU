@@ -25,7 +25,7 @@ public class VipServerAccessPlugIn : IAccountLoginValidationPlugIn, ISupportCust
         var configuration = this.Configuration ?? CreateDefaultConfiguration();
         if (configuration.MinimumVipLevel <= 0
             || player.GameContext is not IGameServerContext gameServerContext
-            || !configuration.RestrictedServerIds.Contains(gameServerContext.Id)
+            || !configuration.RestrictedServers.Contains(gameServerContext.Id)
             || (configuration.BypassGameMasters && IsGameMaster(eventArgs.Account.State)))
         {
             return ValueTask.CompletedTask;

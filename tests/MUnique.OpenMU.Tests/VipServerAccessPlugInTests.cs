@@ -64,6 +64,26 @@ public class VipServerAccessPlugInTests
         Assert.That(eventArgs.Cancel, Is.False);
     }
 
+    [Test]
+    public void LegacyBinaryServerIdsUseNewDefaults()
+    {
+        var plugInConfiguration = new PlugInConfiguration
+        {
+            CustomConfiguration = """
+                {
+                  "MinimumVipLevel": 1,
+                  "BypassGameMasters": true,
+                  "RestrictedServerIds": ""
+                }
+                """,
+        };
+
+        var configuration = plugInConfiguration.GetConfiguration<VipServerAccessPlugInConfiguration>(null);
+
+        Assert.That(configuration, Is.Not.Null);
+        Assert.That(configuration!.RestrictedServers, Is.EqualTo(new[] { 3, 4 }));
+    }
+
     private static VipServerAccessPlugIn CreatePlugIn()
     {
         return new VipServerAccessPlugIn
@@ -71,7 +91,7 @@ public class VipServerAccessPlugInTests
             Configuration = new VipServerAccessPlugInConfiguration
             {
                 MinimumVipLevel = 1,
-                RestrictedServerIds = [3, 4],
+                RestrictedServers = [3, 4],
                 BypassGameMasters = true,
             },
         };
