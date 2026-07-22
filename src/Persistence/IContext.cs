@@ -56,6 +56,12 @@ public interface IContext : IDisposable
     void Attach(object item);
 
     /// <summary>
+    /// Marks an entity which was created by this context as new after its object graph has been assembled.
+    /// </summary>
+    /// <param name="item">The newly created entity.</param>
+    void MarkNew(object item);
+
+    /// <summary>
     /// Creates a new instance of <typeparamref name="T" />.
     /// Attention: This operation needs a currently used context in the current thread!.
     /// </summary>

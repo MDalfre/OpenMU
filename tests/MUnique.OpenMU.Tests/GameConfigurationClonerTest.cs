@@ -128,6 +128,8 @@ public class GameConfigurationClonerTest
         {
             Assert.That(clonedItemSlotType.ItemSlots, Is.EqualTo(new[] { 0, 1 }));
             Assert.That(clonedItemSlotType.RawItemSlots, Is.EqualTo("0;1"));
+            Assert.That(targetContext.NewEntities, Does.Contain(clone));
+            Assert.That(targetContext.NewEntities, Does.Contain(clonedItemSlotType));
         });
     }
 
@@ -136,6 +138,13 @@ public class GameConfigurationClonerTest
         public StringBackedCollectionContext()
             : base(new InMemoryRepositoryProvider())
         {
+        }
+
+        public ISet<object> NewEntities { get; } = new HashSet<object>(ReferenceEqualityComparer.Instance);
+
+        public override void MarkNew(object item)
+        {
+            this.NewEntities.Add(item);
         }
 
         object IContext.CreateNew(Type type, params object?[] args)

@@ -33,6 +33,11 @@ public static class GameConfigurationCloner
             CopyProperties(sourceEntity, targetEntity, clones);
         }
 
+        foreach (var targetEntity in clones.Values.Distinct(ReferenceEqualityComparer.Instance))
+        {
+            context.MarkNew(targetEntity);
+        }
+
         return (GameConfiguration)clones[source];
     }
 

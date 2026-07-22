@@ -100,6 +100,11 @@ public class InMemoryContext : IContext
     }
 
     /// <inheritdoc/>
+    public virtual void MarkNew(object item)
+    {
+    }
+
+    /// <inheritdoc/>
     public T CreateNew<T>(params object?[] args)
         where T : class
     {
