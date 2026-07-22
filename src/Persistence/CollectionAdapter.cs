@@ -72,9 +72,8 @@ public class CollectionAdapter<TClass, TEfCore> : ICollection<TClass>, INotifyCo
     /// <inheritdoc />
     public void Clear()
     {
-        var items = this._rawCollection.ToList();
         this._rawCollection.Clear();
-        this.CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset, items));
+        this.CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
 
     /// <inheritdoc />

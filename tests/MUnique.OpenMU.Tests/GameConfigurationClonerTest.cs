@@ -4,6 +4,7 @@
 
 namespace MUnique.OpenMU.Tests;
 
+using System.Collections.Specialized;
 using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.DataModel.Configuration.Items;
 using MUnique.OpenMU.Persistence;
@@ -15,6 +16,26 @@ using MUnique.OpenMU.Persistence.InMemory;
 [TestFixture]
 public class GameConfigurationClonerTest
 {
+    /// <summary>
+    /// Verifies that clearing an observed collection emits a valid reset event.
+    /// </summary>
+    [Test]
+    public void ObservedCollectionCanBeCleared()
+    {
+        var rawCollection = new List<string> { "entry" };
+        var adapter = new CollectionAdapter<object, string>(rawCollection);
+        NotifyCollectionChangedEventArgs? eventArgs = null;
+        adapter.CollectionChanged += (_, args) => eventArgs = args;
+
+        adapter.Clear();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rawCollection, Is.Empty);
+            Assert.That(eventArgs?.Action, Is.EqualTo(NotifyCollectionChangedAction.Reset));
+        });
+    }
+
     /// <summary>
     /// Verifies that cloned entities have new identities and references only point into the cloned graph.
     /// </summary>
