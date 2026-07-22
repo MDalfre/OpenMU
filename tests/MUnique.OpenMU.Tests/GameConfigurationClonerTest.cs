@@ -66,6 +66,13 @@ public class GameConfigurationClonerTest
         itemOfSet.ItemSetGroup = itemSet;
         itemSet.Items.Add(itemOfSet);
 
+        var monster = context.CreateNew<MonsterDefinition>();
+        monster.Designation = "Elf Soldier";
+        source.Monsters.Add(monster);
+        var buff = context.CreateNew<Buff>();
+        buff.MagicEffectDefinition = context.CreateNew<MagicEffectDefinition>();
+        monster.Buffs.Add(buff);
+
         var clone = GameConfigurationCloner.Clone(source, context);
         var clonedMap = clone.Maps.Single();
         var clonedDropGroup = clone.DropItemGroups.Single();
@@ -82,6 +89,10 @@ public class GameConfigurationClonerTest
             Assert.That(clonedMap.TerrainData, Is.EqualTo(map.TerrainData));
             Assert.That(clone.ItemSetGroups.Single().Items.Single().Name, Is.EqualTo("Warrior Leather Helm"));
             Assert.That(clone.ItemSetGroups.Single().Items.Single().ItemDefinition, Is.SameAs(clone.Items.Single()));
+            Assert.That(clone.Monsters.Single().Buffs.Single().MagicEffectDefinition, Is.Not.SameAs(buff.MagicEffectDefinition));
+            Assert.That(
+                clone.Monsters.Single().Buffs.Single().GetType().GetProperty("RawMagicEffectDefinition")?.GetValue(clone.Monsters.Single().Buffs.Single()),
+                Is.SameAs(clone.Monsters.Single().Buffs.Single().MagicEffectDefinition));
         });
 
         clonedMap.Name = "Gold Lorencia";

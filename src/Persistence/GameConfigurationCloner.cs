@@ -87,12 +87,14 @@ public static class GameConfigurationCloner
                 _ => sourceValue,
             };
             property.SetValue(target, targetValue);
+            SetRawReference(property, target, targetValue);
         }
     }
 
     private static void CopyCollection(PropertyInfo property, IEnumerable source, object target, IReadOnlyDictionary<object, object> clones)
     {
-        var targetCollection = property.GetValue(target)
+        var rawProperty = target.GetType().GetProperty($"Raw{property.Name}", BindingFlags.Public | BindingFlags.Instance);
+        var targetCollection = rawProperty?.GetValue(target) ?? property.GetValue(target)
             ?? throw new InvalidOperationException($"Collection '{property.DeclaringType?.FullName}.{property.Name}' is not initialized.");
         var collectionInterface = targetCollection.GetType().GetInterfaces()
             .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>));
@@ -107,6 +109,16 @@ public static class GameConfigurationCloner
         {
             var targetItem = item is IIdentifiable ? clones[item] : item;
             addMethod.Invoke(targetCollection, new[] { targetItem });
+        }
+    }
+
+    private static void SetRawReference(PropertyInfo property, object target, object? targetValue)
+    {
+        var rawProperty = target.GetType().GetProperty($"Raw{property.Name}", BindingFlags.Public | BindingFlags.Instance);
+        if (rawProperty?.CanWrite is true
+            && (targetValue is null || rawProperty.PropertyType.IsInstanceOfType(targetValue)))
+        {
+            rawProperty.SetValue(target, targetValue);
         }
     }
 
