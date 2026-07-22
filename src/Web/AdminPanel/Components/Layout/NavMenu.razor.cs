@@ -7,6 +7,7 @@ namespace MUnique.OpenMU.Web.AdminPanel.Components.Layout;
 using System.Threading;
 using Microsoft.AspNetCore.Components;
 
+using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.Persistence;
 using MUnique.OpenMU.Persistence.Initialization.Updates;
 using MUnique.OpenMU.Web.AdminPanel.Services;
@@ -17,6 +18,8 @@ using MUnique.OpenMU.Web.Shared.Services;
 /// </summary>
 public partial class NavMenu : IDisposable
 {
+    private readonly List<GameConfigurationItem> _gameConfigurations = new();
+
     private bool _collapseNavMenu = true;
 
     private bool _isLoadingConfig = false;
@@ -39,6 +42,9 @@ public partial class NavMenu : IDisposable
 
     [Inject]
     private NavigationHistory NavigationHistory { get; set; } = null!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = null!;
 
     private Guid? GameConfigurationId { get; set; }
 
@@ -103,7 +109,12 @@ public partial class NavMenu : IDisposable
             }
 
             using var context = this.PersistenceContextProvider.CreateNewConfigurationContext();
-            this.GameConfigurationId = await context.GetDefaultGameConfigurationIdAsync(cts.Token).ConfigureAwait(true);
+            var defaultConfigurationId = await context.GetDefaultGameConfigurationIdAsync(cts.Token).ConfigureAwait(true);
+            var configurations = (await context.GetAsync<GameConfiguration>(cts.Token).ConfigureAwait(true)).ToList();
+            this._gameConfigurations.Clear();
+            this._gameConfigurations.AddRange(configurations.Select(configuration =>
+                new GameConfigurationItem(((IIdentifiable)configuration).Id, configuration.Name)));
+            this.GameConfigurationId = defaultConfigurationId ?? this._gameConfigurations.FirstOrDefault()?.Id;
         }
         catch
         {
@@ -144,4 +155,16 @@ public partial class NavMenu : IDisposable
     {
         this._collapseNavMenu = !this._collapseNavMenu;
     }
+
+    private void OnGameConfigurationChanged(ChangeEventArgs args)
+    {
+        if (Guid.TryParse(args.Value?.ToString(), out var id))
+        {
+            this.GameConfigurationId = id;
+            this.NavigationHistory.Clear();
+            this.NavigationManager.NavigateTo($"edit-config/{typeof(GameConfiguration).FullName}/{id}/hide-collections");
+        }
+    }
+
+    private sealed record GameConfigurationItem(Guid Id, string Name);
 }

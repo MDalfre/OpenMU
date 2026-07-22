@@ -29,4 +29,9 @@ public partial class ConfigNavMenu
     {
         this._expandGameConfig = !this._expandGameConfig;
     }
+
+    private string ConfigGridUrl(Type type)
+    {
+        return $"edit-config-grid/{type.FullName}/{this.GameConfigurationId}";
+    }
 }

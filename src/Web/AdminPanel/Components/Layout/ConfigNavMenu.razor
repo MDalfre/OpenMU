@@ -11,16 +11,16 @@
         <NavLink class="dropdown-item" href="@($"edit-config-grid/{typeof(GameClientDefinition).FullName}/")" @onclick="() => NavigationHistory.Clear()">@Resources.GameClients</NavLink>
         <hr class="dropdown-divider"/>
         <NavLink class="dropdown-item" href="@($"edit-config/{typeof(GameConfiguration).FullName}/{this.GameConfigurationId}/hide-collections")" @onclick="() => NavigationHistory.Clear()">@Resources.General</NavLink>
-        <NavLink class="dropdown-item" href="@($"edit-config-grid/{typeof(MonsterDefinition).FullName}/")" @onclick="() => NavigationHistory.Clear()">@Resources.Monsters</NavLink>
-        <NavLink class="dropdown-item" href="@($"merchants/")" @onclick="() => NavigationHistory.Clear()">@Resources.MerchantStores</NavLink>
-        <NavLink class="dropdown-item" href="@($"edit-config-grid/{typeof(CharacterClass).FullName}/")" @onclick="() => NavigationHistory.Clear()">@Resources.CharacterClasses</NavLink>
-        <NavLink class="dropdown-item" href="@($"edit-config-grid/{typeof(Skill).FullName}/")" @onclick="() => NavigationHistory.Clear()">@Resources.Skills</NavLink>
-        <NavLink class="dropdown-item" href="@($"edit-config-grid/{typeof(ItemDefinition).FullName}/")" @onclick="() => NavigationHistory.Clear()">@Resources.Items</NavLink>
-        <NavLink class="dropdown-item" href="@($"edit-config-grid/{typeof(DropItemGroup).FullName}/")" @onclick="() => NavigationHistory.Clear()">@Resources.DropItemGroups</NavLink>
-        <NavLink class="dropdown-item" href="@($"edit-config-grid/{typeof(GameMapDefinition).FullName}/")" @onclick="() => NavigationHistory.Clear()">@Resources.GameMaps</NavLink>
-        <NavLink class="dropdown-item" href="@($"edit-config-grid/{typeof(MiniGameDefinition).FullName}/")" @onclick="() => NavigationHistory.Clear()">@Resources.MiniGames</NavLink>
-        <NavLink class="dropdown-item" href="@($"edit-config-grid/{typeof(WarpInfo).FullName}/")" @onclick="() => NavigationHistory.Clear()">@Resources.WarpList</NavLink>
-        <NavLink class="dropdown-item" href="@($"edit-config-grid/{typeof(JewelMix).FullName}/")" @onclick="() => NavigationHistory.Clear()">@Resources.JewelMixes</NavLink>
+        <NavLink class="dropdown-item" href="@ConfigGridUrl(typeof(MonsterDefinition))" @onclick="() => NavigationHistory.Clear()">@Resources.Monsters</NavLink>
+        <NavLink class="dropdown-item" href="@($"merchants/{this.GameConfigurationId}")" @onclick="() => NavigationHistory.Clear()">@Resources.MerchantStores</NavLink>
+        <NavLink class="dropdown-item" href="@ConfigGridUrl(typeof(CharacterClass))" @onclick="() => NavigationHistory.Clear()">@Resources.CharacterClasses</NavLink>
+        <NavLink class="dropdown-item" href="@ConfigGridUrl(typeof(Skill))" @onclick="() => NavigationHistory.Clear()">@Resources.Skills</NavLink>
+        <NavLink class="dropdown-item" href="@ConfigGridUrl(typeof(ItemDefinition))" @onclick="() => NavigationHistory.Clear()">@Resources.Items</NavLink>
+        <NavLink class="dropdown-item" href="@ConfigGridUrl(typeof(DropItemGroup))" @onclick="() => NavigationHistory.Clear()">@Resources.DropItemGroups</NavLink>
+        <NavLink class="dropdown-item" href="@ConfigGridUrl(typeof(GameMapDefinition))" @onclick="() => NavigationHistory.Clear()">@Resources.GameMaps</NavLink>
+        <NavLink class="dropdown-item" href="@ConfigGridUrl(typeof(MiniGameDefinition))" @onclick="() => NavigationHistory.Clear()">@Resources.MiniGames</NavLink>
+        <NavLink class="dropdown-item" href="@ConfigGridUrl(typeof(WarpInfo))" @onclick="() => NavigationHistory.Clear()">@Resources.WarpList</NavLink>
+        <NavLink class="dropdown-item" href="@ConfigGridUrl(typeof(JewelMix))" @onclick="() => NavigationHistory.Clear()">@Resources.JewelMixes</NavLink>
         <hr class="dropdown-divider"/>
         <NavLink class="dropdown-item" href="plugins" @onclick="() => NavigationHistory.Clear()">
             <span class="oi oi-puzzle-piece" aria-hidden="true"></span> @Resources.Plugins
@@ -29,7 +29,7 @@
             <span class="oi oi-globe" aria-hidden="true"></span> @Resources.MapEditor
         </NavLink>
         <hr class="dropdown-divider"/>
-        <NavLink class="dropdown-item" href="@($"edit-config/{typeof(GameConfiguration).FullName}/")" Match="NavLinkMatch.All" @onclick="() => NavigationHistory.Clear()">
+        <NavLink class="dropdown-item" href="@ConfigGridUrl(typeof(GameConfiguration))" Match="NavLinkMatch.All" @onclick="() => NavigationHistory.Clear()">
             <span class="oi oi-cog" aria-hidden="true"></span> @Resources.FullConfiguration
         </NavLink>
     </div>

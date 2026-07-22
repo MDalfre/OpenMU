@@ -19,6 +19,11 @@ using MUnique.OpenMU.PlugIns;
 public partial class GameConfiguration
 {
     /// <summary>
+    /// Gets or sets the name of this game configuration.
+    /// </summary>
+    public string Name { get; set; } = "Default Game Configuration";
+
+    /// <summary>
     /// Gets or sets the maximum reachable level.
     /// </summary>
     public short MaximumLevel { get; set; }
@@ -303,6 +308,6 @@ public partial class GameConfiguration
     /// <inheritdoc />
     public override string ToString()
     {
-        return "Default Game Configuration";
+        return this.Name;
     }
 }

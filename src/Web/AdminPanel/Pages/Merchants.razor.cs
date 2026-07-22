@@ -34,6 +34,12 @@ public partial class Merchants : ComponentBase, IAsyncDisposable
     private IDisposable? _navigationLockDisposable;
 
     /// <summary>
+    /// Gets or sets the game configuration identifier.
+    /// </summary>
+    [Parameter]
+    public Guid GameConfigurationId { get; set; }
+
+    /// <summary>
     /// Gets or sets the data source.
     /// </summary>
     [Inject]
@@ -147,7 +153,7 @@ public partial class Merchants : ComponentBase, IAsyncDisposable
             cancellationToken.ThrowIfCancellationRequested();
 
             this._persistenceContext = await this.DataSource.GetContextAsync(cancellationToken).ConfigureAwait(true);
-            await this.DataSource.GetOwnerAsync(cancellationToken: cancellationToken).ConfigureAwait(true);
+            await this.DataSource.GetOwnerAsync(this.GameConfigurationId, cancellationToken).ConfigureAwait(true);
 
             var data = this.DataSource.GetAll<MonsterDefinition>()
                 .Where(m => m is { ObjectKind: NpcObjectKind.PassiveNpc, MerchantStore: { } });

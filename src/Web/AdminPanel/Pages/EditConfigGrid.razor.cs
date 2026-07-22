@@ -39,6 +39,12 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
     public string TypeString { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the game configuration identifier.
+    /// </summary>
+    [Parameter]
+    public Guid GameConfigurationId { get; set; }
+
+    /// <summary>
     /// Gets or sets the data source.
     /// </summary>
     [Inject]
@@ -159,7 +165,7 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
         }
 
         IEnumerable data;
-        var gameConfiguration = await this.DataSource.GetOwnerAsync(default, cancellationToken).ConfigureAwait(true);
+        var gameConfiguration = await this.DataSource.GetOwnerAsync(this.GameConfigurationId, cancellationToken).ConfigureAwait(true);
         if (this.DataSource.IsSupporting(this.Type))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -200,7 +206,7 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
             }
 
             var cancellationToken = this._disposeCts?.Token ?? default;
-            var gameConfiguration = await this.DataSource.GetOwnerAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            var gameConfiguration = await this.DataSource.GetOwnerAsync(this.GameConfigurationId, cancellationToken).ConfigureAwait(false);
             using var deleteContext = this.PersistenceContextProvider.CreateNewTypedContext(this.Type!, false, gameConfiguration);
             var toDelete = await deleteContext.GetByIdAsync(viewModel.Id, this.Type!, cancellationToken).ConfigureAwait(false);
             if (toDelete is null)
@@ -226,7 +232,7 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
     private async Task OnCreateButtonClickAsync()
     {
         var cancellationToken = this._disposeCts?.Token ?? default;
-        var gameConfiguration = await this.DataSource.GetOwnerAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        var gameConfiguration = await this.DataSource.GetOwnerAsync(this.GameConfigurationId, cancellationToken).ConfigureAwait(false);
         var creationContext = this.PersistenceContextProvider.CreateNewTypedContext(this.Type!, true, gameConfiguration);
         try
         {
@@ -281,7 +287,7 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
         try
         {
             var cancellationToken = this._disposeCts?.Token ?? default;
-            var gameConfiguration = await this.DataSource.GetOwnerAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            var gameConfiguration = await this.DataSource.GetOwnerAsync(this.GameConfigurationId, cancellationToken).ConfigureAwait(false);
             var context = this.PersistenceContextProvider.CreateNewTypedContext(this.Type!, true, gameConfiguration);
             try
             {
@@ -337,6 +343,11 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
 
     private async Task<object?> DuplicateObjectAsync(object original, GameConfiguration gameConfiguration, IContext context, ViewModel viewModel, CancellationToken cancellationToken)
     {
+        if (original is GameConfiguration sourceGameConfiguration)
+        {
+            return GameConfigurationCloner.Clone(sourceGameConfiguration, context);
+        }
+
         var cloned = this.CreateClone(original, gameConfiguration, viewModel);
         if (cloned is null)
         {

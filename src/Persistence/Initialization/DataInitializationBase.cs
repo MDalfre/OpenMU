@@ -92,6 +92,7 @@ public abstract class DataInitializationBase : IDataInitializationPlugIn
         {
             this.GameConfiguration = temporaryContext.CreateNew<GameConfiguration>();
             this.GameConfiguration.SetGuid(1);
+            this.GameConfiguration.Name = "Default Game Configuration";
             this.CreateSystemConfiguration(temporaryContext);
             using var tempSuspension = temporaryContext.SuspendChangeNotifications();
             await temporaryContext.SaveChangesAsync().ConfigureAwait(false);
