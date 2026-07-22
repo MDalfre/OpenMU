@@ -83,6 +83,14 @@ internal class EntityFrameworkContextBase : IContext
             acceptChanges = false;
         }
 
+        if (this.Context.ChangeTracker.Entries<GameConfiguration>().Any(entry => entry.State == EntityState.Added))
+        {
+            var relevantEntries = this.Context.ChangeTracker.Entries()
+                .Where(entry => entry.Entity is DuelConfiguration or ExitGate)
+                .Select(entry => $"{entry.Entity.GetType().Name}:{entry.Entity.GetId()}:{entry.State}");
+            this._logger.LogInformation("Game configuration clone persistence states: {States}", string.Join(", ", relevantEntries));
+        }
+
         try
         {
             await this.Context.SaveChangesAsync(acceptChanges, cancellationToken).ConfigureAwait(false);
