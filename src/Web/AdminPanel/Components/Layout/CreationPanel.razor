@@ -5,10 +5,12 @@
 @using MUnique.OpenMU.Web.AdminPanel.Properties
 @using MUnique.OpenMU.Web.Shared.Components.Form
 @using MUnique.OpenMU.Web.Shared.Services
+@using Microsoft.Extensions.Logging
 
 @implements IDisposable
 @inject CreationPanelService Panel
 @inject Blazored.Toast.Services.IToastService ToastService
+@inject ILogger<CreationPanel> Logger
 
 @if (this.Panel.Current is { } session)
 {
@@ -61,6 +63,7 @@
         }
         catch (Exception ex)
         {
+            this.Logger.LogError(ex, "Could not save the new entry.");
             this.ToastService.ShowError($"Could not save the new entry: {ex.Message}");
         }
     }
