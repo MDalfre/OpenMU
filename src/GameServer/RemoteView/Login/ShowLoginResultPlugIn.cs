@@ -41,6 +41,7 @@ public class ShowLoginResultPlugIn : IShowLoginResultPlugIn
             LoginResult.BadCountry => LoginResponse.LoginResult.BadCountry,
             LoginResult.ConnectionClosed3Fails => LoginResponse.LoginResult.ConnectionClosed3Fails,
             LoginResult.ConnectionError => LoginResponse.LoginResult.ConnectionError,
+            LoginResult.ChargedChannel => LoginResponse.LoginResult.ChargedChannel,
             LoginResult.InvalidPassword => LoginResponse.LoginResult.InvalidPassword,
             LoginResult.NoChargeInfo => LoginResponse.LoginResult.NoChargeInfo,
             LoginResult.Ok => LoginResponse.LoginResult.Okay,

@@ -34,6 +34,7 @@ The result of a login request.
 | 7 | ConnectionError | An internal error occured during connection. |
 | 8 | ConnectionClosed3Fails | Connection closed because of three failed login requests. |
 | 9 | NoChargeInfo | There is no payment information. |
+| 64 | ChargedChannel | The account is not allowed to enter a charged channel. |
 | 10 | SubscriptionTermOver | The subscription term is over. |
 | 11 | SubscriptionTimeOver | The subscription time is over. |
 | 14 | TemporaryBlocked | The account is temporarily blocked. |

@@ -2245,6 +2245,11 @@
               <Value>9</Value>
             </EnumValue>
             <EnumValue>
+              <Name>ChargedChannel</Name>
+              <Description>The account is not allowed to enter a charged channel.</Description>
+              <Value>64</Value>
+            </EnumValue>
+            <EnumValue>
               <Name>SubscriptionTermOver</Name>
               <Description>The subscription term is over.</Description>
               <Value>10</Value>

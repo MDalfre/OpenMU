@@ -6063,6 +6063,11 @@ public readonly struct LoginResponse
             NoChargeInfo = 9,
 
         /// <summary>
+        /// The account is not allowed to enter a charged channel.
+        /// </summary>
+            ChargedChannel = 64,
+
+        /// <summary>
         /// The subscription term is over.
         /// </summary>
             SubscriptionTermOver = 10,
