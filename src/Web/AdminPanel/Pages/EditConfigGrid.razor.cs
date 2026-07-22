@@ -351,24 +351,24 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
 
     private static async ValueTask SaveDuplicatedGameConfigurationAsync(GameConfiguration gameConfiguration, IContext context)
     {
-        var buffMagicEffects = gameConfiguration.Monsters
-            .SelectMany(monster => monster.Buffs)
-            .Where(buff => buff.MagicEffectDefinition is not null)
-            .Select(buff => (Buff: buff, MagicEffect: buff.MagicEffectDefinition!))
+        var monsterBuffs = gameConfiguration.Monsters
+            .SelectMany(monster => monster.Buffs.Select(buff => (Monster: monster, Buff: buff, MagicEffect: buff.MagicEffectDefinition)))
             .ToList();
 
         using var notificationSuspension = context.SuspendChangeNotifications();
         await context.ExecuteInTransactionAsync(async () =>
         {
-            foreach (var (buff, _) in buffMagicEffects)
+            foreach (var (monster, buff, _) in monsterBuffs)
             {
+                monster.Buffs.Remove(buff);
                 buff.MagicEffectDefinition = null;
             }
 
             await context.SaveChangesAsync().ConfigureAwait(false);
 
-            foreach (var (buff, magicEffect) in buffMagicEffects)
+            foreach (var (monster, buff, magicEffect) in monsterBuffs)
             {
+                monster.Buffs.Add(buff);
                 buff.MagicEffectDefinition = magicEffect;
             }
 
