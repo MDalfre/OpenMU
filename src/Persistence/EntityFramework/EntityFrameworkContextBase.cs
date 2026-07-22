@@ -106,6 +106,22 @@ internal class EntityFrameworkContextBase : IContext
         }
     }
 
+    /// <inheritdoc/>
+    public async ValueTask ExecuteInTransactionAsync(Func<ValueTask> operation, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await this.Context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await operation().ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
     /// <inheritdoc />
     public IDisposable SuspendChangeNotifications()
     {

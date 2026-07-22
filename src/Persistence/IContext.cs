@@ -27,6 +27,14 @@ public interface IContext : IDisposable
     ValueTask<bool> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Executes the specified operation in a transaction.
+    /// </summary>
+    /// <param name="operation">The operation to execute.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task which completes when the transaction has been committed.</returns>
+    ValueTask ExecuteInTransactionAsync(Func<ValueTask> operation, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Suspends the change notifications.
     /// The notifications are re-enabled when the returned disposable is disposed,
     /// but the notifications are not triggered for the changes which happened during the suspension.

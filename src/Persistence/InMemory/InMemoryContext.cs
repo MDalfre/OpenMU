@@ -71,6 +71,12 @@ public class InMemoryContext : IContext
         return result;
     }
 
+    /// <inheritdoc/>
+    public async ValueTask ExecuteInTransactionAsync(Func<ValueTask> operation, CancellationToken cancellationToken = default)
+    {
+        await operation().ConfigureAwait(false);
+    }
+
     /// <inheritdoc />
     public IDisposable SuspendChangeNotifications()
     {

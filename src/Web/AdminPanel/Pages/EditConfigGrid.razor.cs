@@ -316,7 +316,15 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
                     OwnsContext = true,
                     SaveAsync = async () =>
                     {
-                        await context.SaveChangesAsync().ConfigureAwait(false);
+                        if (newObject is GameConfiguration duplicatedGameConfiguration)
+                        {
+                            await SaveDuplicatedGameConfigurationAsync(duplicatedGameConfiguration, context).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            await context.SaveChangesAsync().ConfigureAwait(false);
+                        }
+
                         await this.DataSource.ForceDiscardChangesAsync().ConfigureAwait(false);
                         this.ToastService.ShowSuccess(string.Format(Resources.DuplicatedSuccessfully, duplicatedName));
                     },
@@ -339,6 +347,33 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
             this.Logger.LogError(ex, "Error duplicating {viewModelName}.", viewModel.Name);
             this.ToastService.ShowError(string.Format(Resources.ErrorDuplicating, viewModel.Name, ex.Message));
         }
+    }
+
+    private static async ValueTask SaveDuplicatedGameConfigurationAsync(GameConfiguration gameConfiguration, IContext context)
+    {
+        var buffMagicEffects = gameConfiguration.Monsters
+            .SelectMany(monster => monster.Buffs)
+            .Where(buff => buff.MagicEffectDefinition is not null)
+            .Select(buff => (Buff: buff, MagicEffect: buff.MagicEffectDefinition!))
+            .ToList();
+
+        using var notificationSuspension = context.SuspendChangeNotifications();
+        await context.ExecuteInTransactionAsync(async () =>
+        {
+            foreach (var (buff, _) in buffMagicEffects)
+            {
+                buff.MagicEffectDefinition = null;
+            }
+
+            await context.SaveChangesAsync().ConfigureAwait(false);
+
+            foreach (var (buff, magicEffect) in buffMagicEffects)
+            {
+                buff.MagicEffectDefinition = magicEffect;
+            }
+
+            await context.SaveChangesAsync().ConfigureAwait(false);
+        }).ConfigureAwait(false);
     }
 
     private async Task<object?> DuplicateObjectAsync(object original, GameConfiguration gameConfiguration, IContext context, ViewModel viewModel, CancellationToken cancellationToken)
