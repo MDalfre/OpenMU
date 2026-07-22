@@ -125,6 +125,8 @@ public static class GameConfigurationCloner
     private static IEnumerable<PropertyInfo> GetModelProperties(Type contractType)
     {
         return contractType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(property => property.CanRead && property.Name != nameof(IIdentifiable.Id));
+            .Where(property => property.CanRead
+                && property.GetIndexParameters().Length == 0
+                && property.Name != nameof(IIdentifiable.Id));
     }
 }
