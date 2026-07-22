@@ -112,6 +112,7 @@ internal class EntityFrameworkContextBase : IContext
         await using var transaction = await this.Context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            await this.Context.Database.ExecuteSqlRawAsync("SET CONSTRAINTS ALL DEFERRED", cancellationToken).ConfigureAwait(false);
             await operation().ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
