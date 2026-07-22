@@ -176,13 +176,18 @@ public static class GameConfigurationCloner
     private static Type GetContractType(object entity)
     {
         var type = entity.GetType();
-        while (type.Assembly == typeof(IContext).Assembly)
+        while (IsPersistenceType(type) || type.BaseType is { } baseType && IsPersistenceType(baseType))
         {
             type = type.BaseType
                 ?? throw new InvalidOperationException($"No data model type found for '{entity.GetType().FullName}'.");
         }
 
         return type;
+    }
+
+    private static bool IsPersistenceType(Type type)
+    {
+        return type.Assembly.GetName().Name?.StartsWith("MUnique.OpenMU.Persistence", StringComparison.Ordinal) is true;
     }
 
     private static IEnumerable<PropertyInfo> GetModelProperties(Type contractType)
