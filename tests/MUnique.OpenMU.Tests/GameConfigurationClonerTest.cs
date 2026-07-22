@@ -103,4 +103,52 @@ public class GameConfigurationClonerTest
             Assert.That(map.TerrainData![0], Is.EqualTo(1));
         });
     }
+
+    /// <summary>
+    /// Verifies that a collection which is persisted through a raw string is copied through its mutable adapter.
+    /// </summary>
+    [Test]
+    public void CloneCopiesStringBackedCollection()
+    {
+        var sourceContext = new InMemoryContext(new InMemoryRepositoryProvider());
+        var source = sourceContext.CreateNew<GameConfiguration>();
+        var itemSlotType = sourceContext.CreateNew<ItemSlotType>();
+        itemSlotType.ItemSlots.Add(0);
+        itemSlotType.ItemSlots.Add(1);
+        source.ItemSlotTypes.Add(itemSlotType);
+
+        var targetContext = new StringBackedCollectionContext();
+        var clone = GameConfigurationCloner.Clone(source, targetContext);
+        var clonedItemSlotType = (StringBackedItemSlotType)clone.ItemSlotTypes.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(clonedItemSlotType.ItemSlots, Is.EqualTo(new[] { 0, 1 }));
+            Assert.That(clonedItemSlotType.RawItemSlots, Is.EqualTo("0;1"));
+        });
+    }
+
+    private sealed class StringBackedCollectionContext : InMemoryContext, IContext
+    {
+        public StringBackedCollectionContext()
+            : base(new InMemoryRepositoryProvider())
+        {
+        }
+
+        object IContext.CreateNew(Type type, params object?[] args)
+        {
+            return type == typeof(ItemSlotType)
+                ? new StringBackedItemSlotType { Id = GuidV7.NewGuid() }
+                : base.CreateNew(type, args);
+        }
+    }
+
+    private sealed class StringBackedItemSlotType : Persistence.BasicModel.ItemSlotType
+    {
+        private ICollection<int>? _itemSlots;
+
+        public string RawItemSlots { get; set; } = string.Empty;
+
+        public override ICollection<int> ItemSlots => this._itemSlots ??= new CollectionToStringAdapter<int>(this.RawItemSlots, value => this.RawItemSlots = value);
+    }
 }

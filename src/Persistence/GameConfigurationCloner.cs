@@ -94,10 +94,10 @@ public static class GameConfigurationCloner
     private static void CopyCollection(PropertyInfo property, IEnumerable source, object target, IReadOnlyDictionary<object, object> clones)
     {
         var rawProperty = target.GetType().GetProperty($"Raw{property.Name}", BindingFlags.Public | BindingFlags.Instance);
-        var targetCollection = rawProperty?.GetValue(target) ?? property.GetValue(target)
+        var rawCollection = rawProperty?.GetValue(target);
+        var targetCollection = GetCollectionInterface(rawCollection) is not null ? rawCollection : property.GetValue(target)
             ?? throw new InvalidOperationException($"Collection '{property.DeclaringType?.FullName}.{property.Name}' is not initialized.");
-        var collectionInterface = targetCollection.GetType().GetInterfaces()
-            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>));
+        var collectionInterface = GetCollectionInterface(targetCollection);
         if (collectionInterface is null)
         {
             throw new InvalidOperationException($"Collection '{property.DeclaringType?.FullName}.{property.Name}' is not mutable.");
@@ -110,6 +110,12 @@ public static class GameConfigurationCloner
             var targetItem = item is IIdentifiable ? clones[item] : item;
             addMethod.Invoke(targetCollection, new[] { targetItem });
         }
+    }
+
+    private static Type? GetCollectionInterface(object? collection)
+    {
+        return collection?.GetType().GetInterfaces()
+            .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICollection<>));
     }
 
     private static void SetRawReference(PropertyInfo property, object target, object? targetValue)
