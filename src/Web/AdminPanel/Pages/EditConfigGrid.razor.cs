@@ -366,6 +366,8 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
 
     private static async ValueTask SaveDuplicatedGameConfigurationAsync(GameConfiguration gameConfiguration, IContext context)
     {
+        var duelConfiguration = gameConfiguration.DuelConfiguration;
+        var duelExit = duelConfiguration?.Exit;
         var monsterBuffs = gameConfiguration.Monsters
             .SelectMany(monster => monster.Buffs.Select(buff => (Monster: monster, Buff: buff, MagicEffect: buff.MagicEffectDefinition)))
             .ToList();
@@ -377,6 +379,11 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
             {
                 monster.Buffs.Remove(buff);
                 buff.MagicEffectDefinition = null;
+            }
+
+            if (duelConfiguration is not null)
+            {
+                duelConfiguration.Exit = null;
             }
 
             GameConfigurationCloner.MarkGraphAsNew(gameConfiguration, context);
@@ -395,6 +402,11 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
             {
                 monster.Buffs.Add(buff);
                 buff.MagicEffectDefinition = magicEffect;
+            }
+
+            if (duelConfiguration is not null)
+            {
+                duelConfiguration.Exit = duelExit;
             }
 
             await context.SaveChangesAsync().ConfigureAwait(false);
