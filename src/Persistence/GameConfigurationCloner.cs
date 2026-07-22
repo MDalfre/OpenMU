@@ -6,6 +6,7 @@ namespace MUnique.OpenMU.Persistence;
 
 using System.Collections;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using MUnique.OpenMU.DataModel.Configuration;
 
 /// <summary>
@@ -24,7 +25,7 @@ public static class GameConfigurationCloner
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(context);
 
-        var clones = new Dictionary<object, object>(ReferenceEqualityComparer.Instance);
+        var clones = new Dictionary<object, object>(EntityIdentityComparer.Instance);
         DiscoverEntities(source, context, clones);
 
         foreach (var (sourceEntity, targetEntity) in clones)
@@ -146,5 +147,31 @@ public static class GameConfigurationCloner
             .Where(property => property.CanRead
                 && property.GetIndexParameters().Length == 0
                 && property.Name != nameof(IIdentifiable.Id));
+    }
+
+    private sealed class EntityIdentityComparer : IEqualityComparer<object>
+    {
+        public static EntityIdentityComparer Instance { get; } = new();
+
+        public new bool Equals(object? x, object? y)
+        {
+            if (ReferenceEquals(x, y))
+            {
+                return true;
+            }
+
+            return x is IIdentifiable left
+                && y is IIdentifiable right
+                && left.Id != Guid.Empty
+                && left.Id == right.Id
+                && GetContractType(x) == GetContractType(y);
+        }
+
+        public int GetHashCode(object obj)
+        {
+            return obj is IIdentifiable identifiable && identifiable.Id != Guid.Empty
+                ? HashCode.Combine(GetContractType(obj), identifiable.Id)
+                : RuntimeHelpers.GetHashCode(obj);
+        }
     }
 }

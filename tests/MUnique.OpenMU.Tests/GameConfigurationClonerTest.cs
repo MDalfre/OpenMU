@@ -70,7 +70,9 @@ public class GameConfigurationClonerTest
         monster.Designation = "Elf Soldier";
         source.Monsters.Add(monster);
         var buff = context.CreateNew<Buff>();
-        buff.MagicEffectDefinition = context.CreateNew<MagicEffectDefinition>();
+        var magicEffect = context.CreateNew<MagicEffectDefinition>();
+        source.MagicEffects.Add(magicEffect);
+        buff.MagicEffectDefinition = new Persistence.BasicModel.MagicEffectDefinition { Id = ((IIdentifiable)magicEffect).Id };
         monster.Buffs.Add(buff);
 
         var clone = GameConfigurationCloner.Clone(source, context);
@@ -90,6 +92,7 @@ public class GameConfigurationClonerTest
             Assert.That(clone.ItemSetGroups.Single().Items.Single().Name, Is.EqualTo("Warrior Leather Helm"));
             Assert.That(clone.ItemSetGroups.Single().Items.Single().ItemDefinition, Is.SameAs(clone.Items.Single()));
             Assert.That(clone.Monsters.Single().Buffs.Single().MagicEffectDefinition, Is.Not.SameAs(buff.MagicEffectDefinition));
+            Assert.That(clone.Monsters.Single().Buffs.Single().MagicEffectDefinition, Is.SameAs(clone.MagicEffects.Single()));
             Assert.That(
                 clone.Monsters.Single().Buffs.Single().GetType().GetProperty("RawMagicEffectDefinition")?.GetValue(clone.Monsters.Single().Buffs.Single()),
                 Is.SameAs(clone.Monsters.Single().Buffs.Single().MagicEffectDefinition));
