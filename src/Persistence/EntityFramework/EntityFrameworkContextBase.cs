@@ -92,6 +92,18 @@ internal class EntityFrameworkContextBase : IContext
                 await this.OnSavedChangesAsync(sender, args).ConfigureAwait(false);
             }
         }
+        catch (Exception ex)
+        {
+            this.Context.ChangeTracker.DetectChanges();
+            var relevantEntries = this.Context.ChangeTracker.Entries()
+                .Where(entry => entry.Metadata.ClrType.Name is nameof(Buff) or nameof(MagicEffectDefinition))
+                .Select(entry => $"{entry.Metadata.ClrType.Name} {entry.Entity.GetId()} {entry.State} "
+                    + string.Join(", ", entry.Properties
+                        .Where(property => property.Metadata.IsPrimaryKey() || property.Metadata.IsForeignKey())
+                        .Select(property => $"{property.Metadata.Name}={property.CurrentValue}")));
+            this._logger.LogError(ex, "Saving changes failed. Relevant tracked entities: {relevantEntries}", string.Join(" | ", relevantEntries));
+            throw;
+        }
         finally
         {
             this.Context.SavedChanges -= OnSavedChanges;
