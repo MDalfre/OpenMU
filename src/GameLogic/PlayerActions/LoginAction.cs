@@ -5,6 +5,7 @@
 namespace MUnique.OpenMU.GameLogic.PlayerActions;
 
 using System.Threading;
+using MUnique.OpenMU.GameLogic.PlugIns;
 using MUnique.OpenMU.GameLogic.Views.Login;
 
 /// <summary>
@@ -133,6 +134,17 @@ public class LoginAction
                     return (false, null);
                 }
 
+                if (!await this.ValidateAccountLoginAsync(player, offlineAccount).ConfigureAwait(false))
+                {
+                    if (!isTemplateOffline)
+                    {
+                        await gameServerContext.LoginServer.LogOffAsync(username, gameServerContext.Id).ConfigureAwait(false);
+                    }
+
+                    context.Allowed = false;
+                    return (false, null);
+                }
+
                 return (true, offlineAccount);
             }
 
@@ -141,6 +153,12 @@ public class LoginAction
             {
                 player.Logger.LogError("Failed to load account {Username} after authentication.", username);
                 await player.InvokeViewPlugInAsync<IShowLoginResultPlugIn>(p => p.ShowLoginResultAsync(LoginResult.ConnectionError)).ConfigureAwait(false);
+                context.Allowed = false;
+                return (false, null);
+            }
+
+            if (!await this.ValidateAccountLoginAsync(player, loadedAccount).ConfigureAwait(false))
+            {
                 context.Allowed = false;
                 return (false, null);
             }
@@ -161,6 +179,19 @@ public class LoginAction
             await player.InvokeViewPlugInAsync<IShowLoginResultPlugIn>(p => p.ShowLoginResultAsync(LoginResult.ConnectionError)).ConfigureAwait(false);
             return (false, null);
         }
+    }
+
+    private async ValueTask<bool> ValidateAccountLoginAsync(Player player, Account account)
+    {
+        var eventArgs = new AccountLoginValidationEventArgs(account);
+        await (player.GameContext.PlugInManager.GetPlugInPoint<IAccountLoginValidationPlugIn>()?.ValidateAccountLoginAsync(player, eventArgs) ?? ValueTask.CompletedTask).ConfigureAwait(false);
+        if (!eventArgs.Cancel)
+        {
+            return true;
+        }
+
+        await player.InvokeViewPlugInAsync<IShowLoginResultPlugIn>(p => p.ShowLoginResultAsync(eventArgs.RejectionResult)).ConfigureAwait(false);
+        return false;
     }
 
     private async ValueTask<Account?> HandleOfflineSessionHandoverAsync(Player player, string username)
