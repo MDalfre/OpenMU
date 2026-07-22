@@ -364,6 +364,16 @@ public partial class EditConfigGrid : ComponentBase, IAsyncDisposable
                 buff.MagicEffectDefinition = null;
             }
 
+            GameConfigurationCloner.MarkGraphAsNew(gameConfiguration, context);
+            foreach (var (_, buff, magicEffect) in monsterBuffs)
+            {
+                context.MarkNew(buff);
+                if (magicEffect is not null)
+                {
+                    context.MarkNew(magicEffect);
+                }
+            }
+
             await context.SaveChangesAsync().ConfigureAwait(false);
 
             foreach (var (monster, buff, magicEffect) in monsterBuffs)

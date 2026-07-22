@@ -123,6 +123,8 @@ public class GameConfigurationClonerTest
         var targetContext = new StringBackedCollectionContext();
         var clone = GameConfigurationCloner.Clone(source, targetContext);
         var clonedItemSlotType = (StringBackedItemSlotType)clone.ItemSlotTypes.Single();
+        targetContext.NewEntities.Clear();
+        GameConfigurationCloner.MarkGraphAsNew(clone, targetContext);
 
         Assert.Multiple(() =>
         {

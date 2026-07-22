@@ -41,6 +41,21 @@ public static class GameConfigurationCloner
         return (GameConfiguration)clones[source];
     }
 
+    /// <summary>
+    /// Marks all entities which are reachable from the specified configuration as new.
+    /// </summary>
+    /// <param name="gameConfiguration">The root of the object graph.</param>
+    /// <param name="context">The persistence context which tracks the graph.</param>
+    public static void MarkGraphAsNew(GameConfiguration gameConfiguration, IContext context)
+    {
+        var entities = new HashSet<object>(EntityIdentityComparer.Instance);
+        DiscoverGraphEntities(gameConfiguration, entities);
+        foreach (var entity in entities)
+        {
+            context.MarkNew(entity);
+        }
+    }
+
     private static void DiscoverEntities(object source, IContext context, IDictionary<object, object> clones)
     {
         if (clones.ContainsKey(source))
@@ -63,6 +78,30 @@ public static class GameConfigurationCloner
                 foreach (var item in enumerable.OfType<IIdentifiable>())
                 {
                     DiscoverEntities(item, context, clones);
+                }
+            }
+        }
+    }
+
+    private static void DiscoverGraphEntities(object source, ISet<object> entities)
+    {
+        if (!entities.Add(source))
+        {
+            return;
+        }
+
+        foreach (var property in GetModelProperties(GetContractType(source)))
+        {
+            var value = property.GetValue(source);
+            if (value is IIdentifiable)
+            {
+                DiscoverGraphEntities(value, entities);
+            }
+            else if (value is IEnumerable enumerable and not string and not byte[])
+            {
+                foreach (var item in enumerable.OfType<IIdentifiable>())
+                {
+                    DiscoverGraphEntities(item, entities);
                 }
             }
         }
