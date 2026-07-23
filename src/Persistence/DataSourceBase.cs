@@ -80,10 +80,14 @@ public abstract class DataSourceBase<TOwner> : IDataSource<TOwner>
     {
         using var l = await this._loadLock.LockAsync(cancellationToken).ConfigureAwait(false);
 
-        if (this._owner is { } owner
-            && (ownerId == Guid.Empty || owner.GetId() == ownerId))
+        if (this._owner is { } owner)
         {
-            return owner;
+            if (ownerId == Guid.Empty || owner.GetId() == ownerId)
+            {
+                return owner;
+            }
+
+            this.Reset();
         }
 
         var context = await this.GetContextAsync(cancellationToken).ConfigureAwait(false);
