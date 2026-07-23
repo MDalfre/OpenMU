@@ -298,6 +298,7 @@ public sealed class BotManager
         }
         finally
         {
+            await bot.GameContext.RemovePlayerAsync(bot).ConfigureAwait(false);
             await bot.DisposeAsync().ConfigureAwait(false);
         }
     }
@@ -305,6 +306,7 @@ public sealed class BotManager
     private async ValueTask RemoveAndDisposeAsync(string key, BotPlayer bot)
     {
         this._bots.TryRemove(key, out _);
+        await bot.GameContext.RemovePlayerAsync(bot).ConfigureAwait(false);
         await bot.DisposeAsync().ConfigureAwait(false);
     }
 }

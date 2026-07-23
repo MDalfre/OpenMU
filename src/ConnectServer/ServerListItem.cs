@@ -101,7 +101,7 @@ internal class ServerListItem : IGameServerEntry
         set
         {
             this._currentConnections = value;
-            this.ServerLoadPercentage = (byte)(this._currentConnections * 100f / this.MaximumConnections);
+            this.ServerLoadPercentage = this.CalculateLoadPercentage();
         }
     }
 
@@ -109,5 +109,16 @@ internal class ServerListItem : IGameServerEntry
     public override string ToString()
     {
         return $"ServerId={this.ServerId}, ServerLoadPercentage={this.ServerLoadPercentage}";
+    }
+
+    private byte CalculateLoadPercentage()
+    {
+        if (this.MaximumConnections <= 0)
+        {
+            return 100;
+        }
+
+        var percentage = this._currentConnections * 100L / this.MaximumConnections;
+        return (byte)Math.Clamp(percentage, 0, 100);
     }
 }
