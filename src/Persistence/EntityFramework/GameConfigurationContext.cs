@@ -27,6 +27,6 @@ internal class GameConfigurationContext : CachingEntityFrameworkContext, IConfig
     /// <inheritdoc />
     public async ValueTask<Guid?> GetDefaultGameConfigurationIdAsync(CancellationToken cancellationToken)
     {
-        return await this.Context.Set<GameConfiguration>().Select(g => g.Id).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        return await this.Context.Set<GameConfiguration>().OrderBy(g => g.Id).Select(g => g.Id).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
     }
 }

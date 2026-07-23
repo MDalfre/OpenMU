@@ -25,6 +25,6 @@ public class ConfigurationInMemoryContext : InMemoryContext, IConfigurationConte
     public async ValueTask<Guid?> GetDefaultGameConfigurationIdAsync(CancellationToken cancellationToken)
     {
         var allConfigs = await this.Provider.GetRepository<GameConfiguration>().GetAllAsync(cancellationToken).ConfigureAwait(false);
-        return allConfigs.FirstOrDefault()?.Id;
+        return allConfigs.MinBy(config => config.Id)?.Id;
     }
 }
