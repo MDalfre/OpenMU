@@ -28,6 +28,11 @@ public interface IGameContext
     event EventHandler<GameMap>? GameMapRemoved;
 
     /// <summary>
+    /// Occurs when the player count changed.
+    /// </summary>
+    event EventHandler<int>? PlayerCountChanged;
+
+    /// <summary>
     /// Gets the global experience rate.
     /// </summary>
     float ExperienceRate { get; }

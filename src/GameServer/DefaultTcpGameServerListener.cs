@@ -88,6 +88,8 @@ public class DefaultTcpGameServerListener : IGameServerListener
         }
 
         this._stateObserver.RegisterGameServer(this._gameServerInfo, new IPEndPoint(await this._addressResolver.ResolveIPv4Async().ConfigureAwait(false), port));
+        this._gameContext.PlayerCountChanged += this.OnPlayerCountChanged;
+        this._stateObserver.CurrentConnectionsChanged(this._gameContext.Id, this._gameContext.PlayerCount);
 
         if (this._addressResolver is ConfigurableIpResolver configurableIpResolver)
         {
@@ -101,6 +103,7 @@ public class DefaultTcpGameServerListener : IGameServerListener
     /// <inheritdoc/>
     public void Stop()
     {
+        this._gameContext.PlayerCountChanged -= this.OnPlayerCountChanged;
         if (this._addressResolver is ConfigurableIpResolver configurableIpResolver)
         {
             configurableIpResolver.ConfigurationChanged -= this.OnResolverConfigurationChanged;
@@ -178,7 +181,6 @@ public class DefaultTcpGameServerListener : IGameServerListener
         connection.Disconnected += async () =>
         {
             await remotePlayer.DisconnectAsync().ConfigureAwait(false);
-            this._stateObserver.CurrentConnectionsChanged(this._gameContext.Id, this._gameContext.PlayerCount);
         };
 
         await this.OnPlayerConnectedAsync(remotePlayer).ConfigureAwait(false);
@@ -198,8 +200,11 @@ public class DefaultTcpGameServerListener : IGameServerListener
         {
             this.Log(l => l.LogError($"Event {nameof(this.PlayerConnected)} was not handled."));
         }
+    }
 
-        this._stateObserver.CurrentConnectionsChanged(this._gameContext.Id, this._gameContext.PlayerCount);
+    private void OnPlayerCountChanged(object? sender, int playerCount)
+    {
+        this._stateObserver.CurrentConnectionsChanged(this._gameContext.Id, playerCount);
     }
 
     private void Log(Action<ILogger<DefaultTcpGameServerListener>> logAction)

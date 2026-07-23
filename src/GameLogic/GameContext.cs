@@ -111,6 +111,9 @@ public class GameContext : AsyncDisposable, IGameContext
     public event EventHandler<GameMap>? GameMapRemoved;
 
     /// <inheritdoc />
+    public event EventHandler<int>? PlayerCountChanged;
+
+    /// <inheritdoc />
     public virtual float ExperienceRate => this.Configuration.ExperienceRate;
 
     /// <inheritdoc />
@@ -323,6 +326,7 @@ public class GameContext : AsyncDisposable, IGameContext
         }
 
         PlayerCounter.Add(1);
+        this.PlayerCountChanged?.Invoke(this, this.PlayerCount);
     }
 
     /// <inheritdoc />
@@ -355,6 +359,7 @@ public class GameContext : AsyncDisposable, IGameContext
         }
 
         PlayerCounter.Add(-1);
+        this.PlayerCountChanged?.Invoke(this, this.PlayerCount);
         if (player.SelectedCharacter != null)
         {
             this.PlayersByCharacterName.TryRemove(player.SelectedCharacter.Name, out _);
