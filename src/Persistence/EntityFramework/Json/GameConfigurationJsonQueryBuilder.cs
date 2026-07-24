@@ -6,12 +6,23 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Json;
 
 using Microsoft.EntityFrameworkCore.Metadata;
 using MUnique.OpenMU.Persistence.EntityFramework.Model;
+using AttributeDefinition = MUnique.OpenMU.Persistence.EntityFramework.Model.AttributeDefinition;
+using ItemOptionType = MUnique.OpenMU.Persistence.EntityFramework.Model.ItemOptionType;
 
 /// <summary>
 /// <see cref="JsonQueryBuilder"/> for <see cref="GameConfiguration"/>.
 /// </summary>
 public class GameConfigurationJsonQueryBuilder : JsonQueryBuilder
 {
+    /// <inheritdoc/>
+    protected override bool ShouldEmbedNavigation(INavigation navigation)
+    {
+        var targetType = navigation.TargetEntityType.ClrType;
+        return base.ShouldEmbedNavigation(navigation)
+               || targetType == typeof(AttributeDefinition)
+               || targetType == typeof(ItemOptionType);
+    }
+
     /// <inheritdoc/>
     protected override IEnumerable<INavigation> GetNavigations(IEntityType entityType)
     {

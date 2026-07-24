@@ -61,6 +61,16 @@ public class JsonQueryBuilder
         return entityType.GetNavigations();
     }
 
+    /// <summary>
+    /// Determines whether the referenced object should be embedded into the generated json.
+    /// </summary>
+    /// <param name="navigation">The navigation to check.</param>
+    /// <returns><see langword="true" /> if the referenced object should be embedded; otherwise, <see langword="false" />.</returns>
+    protected virtual bool ShouldEmbedNavigation(INavigation navigation)
+    {
+        return navigation.IsMemberOfAggregate();
+    }
+
     private void AddTypeToQuery(IEntityType entityType, StringBuilder stringBuilder, string alias)
     {
         stringBuilder.Append("select ").Append(alias).Append(".\"Id\" as \"$id\", ").Append(alias).Append(".*");
@@ -125,7 +135,7 @@ public class JsonQueryBuilder
         }
 
         stringBuilder.Append(", (");
-        if (!navigation.IsMemberOfAggregate() || isBackReference)
+        if (!this.ShouldEmbedNavigation(navigation) || isBackReference)
         {
             stringBuilder
                 .Append($"case when {parentAlias}.\"{foreignKey.Name}\" is null then null else ")

@@ -10,7 +10,9 @@ using Microsoft.EntityFrameworkCore;
 using MUnique.OpenMU.Persistence.EntityFramework;
 using MUnique.OpenMU.Persistence.EntityFramework.Json;
 using Account = MUnique.OpenMU.Persistence.EntityFramework.Model.Account;
+using AttributeDefinition = MUnique.OpenMU.Persistence.EntityFramework.Model.AttributeDefinition;
 using GameConfiguration = MUnique.OpenMU.Persistence.EntityFramework.Model.GameConfiguration;
+using ItemOptionType = MUnique.OpenMU.Persistence.EntityFramework.Model.ItemOptionType;
 
 /// <summary>
 /// Tests for the <see cref="JsonQueryBuilder"/>.
@@ -50,6 +52,28 @@ internal class JsonQueryBuilderTests
 
         result = $"-- Json query created in {stopwatch.ElapsedMilliseconds} ms:{Environment.NewLine}" + result;
         //// File.WriteAllText(@"C:\temp\json_GameConfiguration.txt", result);
+    }
+
+    /// <summary>
+    /// Ensures that shared configuration references are embedded so that their descriptive fields are available.
+    /// </summary>
+    [Test]
+    public void GameConfigurationJsonQueryBuilderEmbedsSharedReferences()
+    {
+        using var installationContext = new ConfigurationContext();
+        var builder = new TestGameConfigurationJsonQueryBuilder();
+        var attributeNavigation = installationContext.Model.GetEntityTypes()
+            .SelectMany(entityType => entityType.GetNavigations())
+            .First(navigation => navigation.TargetEntityType.ClrType == typeof(AttributeDefinition));
+        var optionTypeNavigation = installationContext.Model.GetEntityTypes()
+            .SelectMany(entityType => entityType.GetNavigations())
+            .First(navigation => navigation.TargetEntityType.ClrType == typeof(ItemOptionType));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ShouldEmbed(attributeNavigation), Is.True);
+            Assert.That(builder.ShouldEmbed(optionTypeNavigation), Is.True);
+        });
     }
 
     /// <summary>
@@ -104,5 +128,13 @@ internal class JsonQueryBuilderTests
         Assert.That(result, Is.Not.Null);
         Assert.That(result.Count, Is.Not.EqualTo(0));
         Assert.That(stopwatch.ElapsedMilliseconds, Is.EqualTo(0));
+    }
+
+    private sealed class TestGameConfigurationJsonQueryBuilder : GameConfigurationJsonQueryBuilder
+    {
+        public bool ShouldEmbed(Microsoft.EntityFrameworkCore.Metadata.INavigation navigation)
+        {
+            return this.ShouldEmbedNavigation(navigation);
+        }
     }
 }
