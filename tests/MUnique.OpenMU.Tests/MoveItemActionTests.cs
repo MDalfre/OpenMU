@@ -27,6 +27,32 @@ using MUnique.OpenMU.PlugIns;
 public class MoveItemActionTests
 {
     /// <summary>
+    /// Verifies that equivalent character classes from different game configurations
+    /// satisfy the item requirements.
+    /// </summary>
+    /// <param name="qualifiedClassNumber">The qualified class number.</param>
+    /// <param name="expectedResult">The expected validation result.</param>
+    [TestCase(12, true)]
+    [TestCase(13, false)]
+    public async ValueTask EquivalentCharacterClassFromClonedConfigurationCanEquipAsync(byte qualifiedClassNumber, bool expectedResult)
+    {
+        var player = await CreateTestPlayerAsync().ConfigureAwait(false);
+        player.SelectedCharacter!.CharacterClass!.Number = 12;
+
+        var definition = new Mock<ItemDefinition>();
+        definition.Setup(d => d.Requirements).Returns(new List<AttributeRequirement>());
+        definition.Setup(d => d.QualifiedCharacters).Returns(
+            new List<CharacterClass>
+            {
+                new() { Number = qualifiedClassNumber },
+            });
+
+        var item = CreateItem(definition.Object, 1);
+
+        Assert.That(player.CompliesRequirements(item), Is.EqualTo(expectedResult));
+    }
+
+    /// <summary>
     /// Verifies that a complete stack move consumes the source item.
     /// </summary>
     [Test]

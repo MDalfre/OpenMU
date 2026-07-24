@@ -949,7 +949,8 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
             }
         }
 
-        return item.Definition.QualifiedCharacters.Contains(this.SelectedCharacter!.CharacterClass!);
+        var characterClassNumber = this.SelectedCharacter!.CharacterClass!.Number;
+        return item.Definition.QualifiedCharacters.Any(characterClass => characterClass.Number == characterClassNumber);
     }
 
     /// <summary>
