@@ -3,6 +3,7 @@ using System;
 using MUnique.OpenMU.Persistence.EntityFramework;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
 {
     [DbContext(typeof(EntityDataContext))]
-    partial class EntityDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260723073950_CascadeDeleteMiniGameRankingEntries")]
+    partial class CascadeDeleteMiniGameRankingEntries
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -104,46 +107,6 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
                     b.HasIndex("CharacterClassId");
 
                     b.ToTable("AccountCharacterClass", "data");
-                });
-
-            modelBuilder.Entity("MUnique.OpenMU.Persistence.EntityFramework.Model.AccountVipEntitlement", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("RevokedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Source")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("SourceReference")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("StartsAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("VipLevel")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId");
-
-                    b.HasIndex("SourceReference")
-                        .IsUnique();
-
-                    b.ToTable("AccountVipEntitlement", "data");
                 });
 
             modelBuilder.Entity("MUnique.OpenMU.Persistence.EntityFramework.Model.AppearanceData", b =>
@@ -1173,10 +1136,6 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
 
                     b.Property<byte>("MinimumMonsterLevelForMasterExperience")
                         .HasColumnType("smallint");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<bool>("PreventExperienceOverflow")
                         .HasColumnType("boolean");
@@ -3556,15 +3515,6 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
                     b.Navigation("CharacterClass");
                 });
 
-            modelBuilder.Entity("MUnique.OpenMU.Persistence.EntityFramework.Model.AccountVipEntitlement", b =>
-                {
-                    b.HasOne("MUnique.OpenMU.Persistence.EntityFramework.Model.Account", null)
-                        .WithMany("RawVipEntitlements")
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("MUnique.OpenMU.Persistence.EntityFramework.Model.AppearanceData", b =>
                 {
                     b.HasOne("MUnique.OpenMU.Persistence.EntityFramework.Model.CharacterClass", "RawCharacterClass")
@@ -5069,8 +5019,6 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
                     b.Navigation("RawAttributes");
 
                     b.Navigation("RawCharacters");
-
-                    b.Navigation("RawVipEntitlements");
                 });
 
             modelBuilder.Entity("MUnique.OpenMU.Persistence.EntityFramework.Model.AppearanceData", b =>
