@@ -108,7 +108,8 @@ public class AddMasterPointAction
             return false;
         }
 
-        if (!skill.QualifiedCharacters.Contains(player.SelectedCharacter.CharacterClass!))
+        var characterClassNumber = player.SelectedCharacter.CharacterClass!.Number;
+        if (!skill.QualifiedCharacters.Any(characterClass => characterClass.Number == characterClassNumber))
         {
             player.Logger.LogWarning("Character not in a qualified class to learn the skill, account {0}, character {1}", player.Account!.LoginName, player.SelectedCharacter.Name);
             return false;

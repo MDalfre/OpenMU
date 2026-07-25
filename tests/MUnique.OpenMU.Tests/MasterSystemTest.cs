@@ -65,6 +65,22 @@ public class MasterSystemTest
     }
 
     /// <summary>
+    /// Tests if adding master points succeeds when the skill belongs to an equivalent class of a cloned game configuration.
+    /// </summary>
+    [Test]
+    public async Task SucceededWithEquivalentClassFromClonedConfigurationAsync()
+    {
+        var characterClass = this._player.SelectedCharacter!.CharacterClass!;
+        this._skillRank1.QualifiedCharacters.Clear();
+        this._skillRank1.QualifiedCharacters.Add(new CharacterClass { Number = characterClass.Number });
+        this._player.SelectedCharacter.MasterLevelUpPoints = 1;
+
+        await this._addAction.AddMasterPointAsync(this._player, (ushort)this._skillIdRank1).ConfigureAwait(false);
+
+        Assert.That(this._player.SelectedCharacter.LearnedSkills, Is.Not.Empty);
+    }
+
+    /// <summary>
     /// Tests if the adding of master points fails because of an insufficient reached skill rank.
     /// </summary>
     [Test]
