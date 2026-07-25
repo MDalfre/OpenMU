@@ -60,6 +60,9 @@ For the communication between the processes, we use [Dapr](https://dapr.io/).
 We provide Docker images and docker-compose files for easy deployment.
 Please take a look at the deploy-folder of this project.
 
+The custom VIP entitlement, Gold server access and account-creation trial flow
+is documented in [docs/VipAccess.md](docs/VipAccess.md).
+
 ## Contributions
 
 Contributions are welcome if they meet the following criteria:

@@ -23,5 +23,18 @@ internal static class AccountExtensions
         builder.HasIndex(account => account.LoginName).IsUnique();
 
         builder.Property(account => account.LanguageIsoCode).HasMaxLength(3).IsRequired().HasDefaultValue("en");
+        builder.HasMany(account => account.RawVipEntitlements)
+            .WithOne()
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+
+    /// <summary>
+    /// Applies the settings for the <see cref="AccountVipEntitlement"/> entity.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    public static void Apply(this EntityTypeBuilder<AccountVipEntitlement> builder)
+    {
+        builder.HasIndex(entitlement => entitlement.SourceReference).IsUnique();
     }
 }

@@ -154,6 +154,12 @@ public class Account
     [MemberOfAggregate]
     public virtual ICollection<StatAttribute> Attributes { get; protected set; } = null!;
 
+    /// <summary>
+    /// Gets or sets the VIP access entitlements which were granted to this account.
+    /// </summary>
+    [MemberOfAggregate]
+    public virtual ICollection<AccountVipEntitlement> VipEntitlements { get; protected set; } = null!;
+
     /// <inheritdoc />
     public override string ToString()
     {

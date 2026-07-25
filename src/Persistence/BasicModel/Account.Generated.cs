@@ -89,6 +89,27 @@ public partial class Account : MUnique.OpenMU.DataModel.Entities.Account, IIdent
     }
 
     /// <summary>
+    /// Gets the raw collection of <see cref="VipEntitlements" />.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("vipEntitlements")]
+    public ICollection<AccountVipEntitlement> RawVipEntitlements { get; } = new List<AccountVipEntitlement>();
+    
+    /// <inheritdoc/>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public override ICollection<MUnique.OpenMU.DataModel.Entities.AccountVipEntitlement> VipEntitlements
+    {
+        get => base.VipEntitlements ??= new CollectionAdapter<MUnique.OpenMU.DataModel.Entities.AccountVipEntitlement, AccountVipEntitlement>(this.RawVipEntitlements);
+        protected set
+        {
+            this.VipEntitlements.Clear();
+            foreach (var item in value)
+            {
+                this.VipEntitlements.Add(item);
+            }
+        }
+    }
+
+    /// <summary>
     /// Gets the raw object of <see cref="Vault" />.
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("vault")]

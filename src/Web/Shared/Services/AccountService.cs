@@ -7,6 +7,7 @@ namespace MUnique.OpenMU.Web.Shared.Services;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using MUnique.OpenMU.DataModel.Entities;
+using MUnique.OpenMU.GameLogic;
 using MUnique.OpenMU.Persistence;
 using MUnique.OpenMU.Web.Shared.Components;
 using MUnique.OpenMU.Web.Shared.Components.Form.Modal;
@@ -147,6 +148,12 @@ public class AccountService : IDataService<Account>, ISupportDataChangedNotifica
             item.State = accountParameters.State;
             item.SecurityCode = accountParameters.SecurityCode;
             item.RegistrationDate = DateTime.UtcNow;
+            VipEntitlementService.GrantAccountCreationTrial(
+                context,
+                item,
+                accountParameters.InitialVipLevel,
+                accountParameters.InitialVipDays,
+                item.RegistrationDate);
             await context.SaveChangesAsync().ConfigureAwait(false);
             this.DataChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -193,5 +200,13 @@ public class AccountService : IDataService<Account>, ISupportDataChangedNotifica
 
         [Display(ResourceType = typeof(Resources), Name = nameof(Resources.AccountCreationParameters_State_Name))]
         public AccountState State { get; set; }
+
+        [Display(Name = "Initial VIP Days", Description = "Set to 0 to create the account without a VIP trial.")]
+        [Range(0, 3650)]
+        public int InitialVipDays { get; set; } = 15;
+
+        [Display(Name = "Initial VIP Level")]
+        [Range(1, 100)]
+        public int InitialVipLevel { get; set; } = 1;
     }
 }

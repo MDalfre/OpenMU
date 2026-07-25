@@ -41,6 +41,9 @@ public static class MapsterConfigurator
         Mapster.TypeAdapterConfig.GlobalSettings.NewConfig<MUnique.OpenMU.DataModel.Entities.Account, MUnique.OpenMU.DataModel.Entities.Account>()
             .Include<Account, BasicModel.Account>();
 
+        Mapster.TypeAdapterConfig.GlobalSettings.NewConfig<MUnique.OpenMU.DataModel.Entities.AccountVipEntitlement, MUnique.OpenMU.DataModel.Entities.AccountVipEntitlement>()
+            .Include<AccountVipEntitlement, BasicModel.AccountVipEntitlement>();
+
         Mapster.TypeAdapterConfig.GlobalSettings.NewConfig<MUnique.OpenMU.DataModel.Entities.AppearanceData, MUnique.OpenMU.DataModel.Entities.AppearanceData>()
             .Include<AppearanceData, BasicModel.AppearanceData>();
 

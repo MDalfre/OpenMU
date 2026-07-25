@@ -43,6 +43,38 @@ public class VipServerAccessPlugInTests
     }
 
     [Test]
+    public async ValueTask RestrictedServerAllowsAccountWithActiveEntitlementAsync()
+    {
+        var (player, account) = CreatePlayerAndAccount(3, 0, AccountState.Normal);
+        var entitlement = new InMemoryPersistenceContextProvider().CreateNewContext().CreateNew<AccountVipEntitlement>();
+        entitlement.VipLevel = 1;
+        entitlement.StartsAtUtc = DateTime.UtcNow.AddDays(-1);
+        entitlement.ExpiresAtUtc = DateTime.UtcNow.AddDays(1);
+        account.VipEntitlements.Add(entitlement);
+        var eventArgs = new AccountLoginValidationEventArgs(account);
+
+        await CreatePlugIn().ValidateAccountLoginAsync(player, eventArgs).ConfigureAwait(false);
+
+        Assert.That(eventArgs.Cancel, Is.False);
+    }
+
+    [Test]
+    public async ValueTask RestrictedServerRejectsExpiredEntitlementAsync()
+    {
+        var (player, account) = CreatePlayerAndAccount(3, 0, AccountState.Normal);
+        var entitlement = new InMemoryPersistenceContextProvider().CreateNewContext().CreateNew<AccountVipEntitlement>();
+        entitlement.VipLevel = 1;
+        entitlement.StartsAtUtc = DateTime.UtcNow.AddDays(-2);
+        entitlement.ExpiresAtUtc = DateTime.UtcNow.AddDays(-1);
+        account.VipEntitlements.Add(entitlement);
+        var eventArgs = new AccountLoginValidationEventArgs(account);
+
+        await CreatePlugIn().ValidateAccountLoginAsync(player, eventArgs).ConfigureAwait(false);
+
+        Assert.That(eventArgs.Cancel, Is.True);
+    }
+
+    [Test]
     public async ValueTask UnrestrictedServerAllowsAccountWithoutVipAsync()
     {
         var (player, account) = CreatePlayerAndAccount(1, 0, AccountState.Normal);

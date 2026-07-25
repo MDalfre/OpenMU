@@ -336,12 +336,18 @@ internal sealed class Program : IDisposable
     private ICollection<PlugInConfiguration> PlugInConfigurationsFactory(IServiceProvider serviceProvider)
     {
         var persistenceContextProvider = serviceProvider.GetService<IPersistenceContextProvider>() ?? throw new Exception($"{nameof(IPersistenceContextProvider)} not registered.");
-        using var context = persistenceContextProvider.CreateNewTypedContext(typeof(PlugInConfiguration), false);
+        using var configurationContext = persistenceContextProvider.CreateNewConfigurationContext();
+        var defaultGameConfigurationId = configurationContext.GetDefaultGameConfigurationIdAsync(default).AsTask().WaitAndUnwrapException()
+                                         ?? throw new InvalidOperationException("Default game configuration not found.");
+        using var context = persistenceContextProvider.CreateNewContext();
+        var gameConfiguration = context.GetByIdAsync<GameConfiguration>(defaultGameConfigurationId).WaitAndUnwrapException()
+                                ?? throw new InvalidOperationException("Default game configuration not found.");
 
-        var configs = context.GetAsync<PlugInConfiguration>().AsTask().WaitAndUnwrapException().ToList();
+        var configs = gameConfiguration.PlugInConfigurations.ToList();
 
-        var referenceHandler = new ByDataSourceReferenceHandler(
-            new GameConfigurationDataSource(serviceProvider.GetService<ILogger<GameConfigurationDataSource>>()!, persistenceContextProvider));
+        var dataSource = new GameConfigurationDataSource(serviceProvider.GetService<ILogger<GameConfigurationDataSource>>()!, persistenceContextProvider);
+        dataSource.GetOwnerAsync(defaultGameConfigurationId).AsTask().WaitAndUnwrapException();
+        var referenceHandler = new ByDataSourceReferenceHandler(dataSource);
 
         // We check if we miss any plugin configurations in the database. If we do, we try to add them.
         var pluginManager = new PlugInManager(null, serviceProvider.GetService<ILoggerFactory>()!, serviceProvider, referenceHandler);
@@ -363,18 +369,23 @@ internal sealed class Program : IDisposable
             return configs;
         }
 
-        configs.AddRange(this.CreateMissingPlugInConfigurations(typesWithMissingConfigs, persistenceContextProvider, referenceHandler));
+        configs.AddRange(this.CreateMissingPlugInConfigurations(typesWithMissingConfigs, persistenceContextProvider, referenceHandler, defaultGameConfigurationId));
         _ = context.SaveChangesAsync().AsTask().WaitAndUnwrapException();
         return configs;
     }
 
-    private IEnumerable<PlugInConfiguration> CreateMissingPlugInConfigurations(IEnumerable<Type> plugInTypes, IPersistenceContextProvider persistenceContextProvider, ReferenceHandler referenceHandler)
+    private IEnumerable<PlugInConfiguration> CreateMissingPlugInConfigurations(
+        IEnumerable<Type> plugInTypes,
+        IPersistenceContextProvider persistenceContextProvider,
+        ReferenceHandler referenceHandler,
+        Guid defaultGameConfigurationId)
     {
         GameConfiguration gameConfiguration;
 
         using (var context = persistenceContextProvider.CreateNewContext())
         {
-            gameConfiguration = context.GetAsync<GameConfiguration>().AsTask().WaitAndUnwrapException().First();
+            gameConfiguration = context.GetByIdAsync<GameConfiguration>(defaultGameConfigurationId).WaitAndUnwrapException()
+                                ?? throw new InvalidOperationException("Default game configuration not found.");
         }
 
         using var saveContext = persistenceContextProvider.CreateNewContext(gameConfiguration);
