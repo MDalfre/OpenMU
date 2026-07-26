@@ -43,7 +43,7 @@ public partial class ExitGatePicker
     /// Gets or sets the event callback for changes of <see cref="SelectedGate"/>.
     /// </summary>
     [Parameter]
-    public EventCallback<ExitGate>? SelectedGateChanged { get; set; }
+    public EventCallback<ExitGate?> SelectedGateChanged { get; set; }
 
     private GameMapDefinition? Map
     {
@@ -67,7 +67,10 @@ public partial class ExitGatePicker
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
-        this.Map = this.SelectedGate?.Map;
+        if (this.SelectedGate?.Map is { } selectedMap)
+        {
+            this.Map = selectedMap;
+        }
     }
 
     /// <inheritdoc />
@@ -97,13 +100,10 @@ public partial class ExitGatePicker
             (this._scale * gate.Y1).ToString(CultureInfo.InvariantCulture));
     }
 
-    private async Task OnSelectedAsync(ExitGate exitGate)
+    private async Task OnSelectedAsync(ExitGate? exitGate)
     {
         this.SelectedGate = exitGate;
-        if (this.SelectedGateChanged is { } eventCallback)
-        {
-            await eventCallback.InvokeAsync(exitGate).ConfigureAwait(false);
-        }
+        await this.SelectedGateChanged.InvokeAsync(exitGate).ConfigureAwait(false);
     }
 
     private async Task OnGateSelectedAsync(ChangeEventArgs args)
@@ -119,6 +119,7 @@ public partial class ExitGatePicker
     {
         if (Guid.TryParse(args.Value as string, out var mapId))
         {
+            await this.OnSelectedAsync(null).ConfigureAwait(false);
             this.Map = await this.PersistenceContext.GetByIdAsync<GameMapDefinition>(mapId).ConfigureAwait(false);
         }
     }

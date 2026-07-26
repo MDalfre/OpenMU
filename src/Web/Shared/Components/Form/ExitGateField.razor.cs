@@ -28,4 +28,10 @@ public partial class ExitGateField : NotifyableInputBase<ExitGate>
     {
         throw new NotImplementedException();
     }
+
+    private Task OnSelectedGateChangedAsync(ExitGate? selectedGate)
+    {
+        this.CurrentValue = selectedGate;
+        return Task.CompletedTask;
+    }
 }

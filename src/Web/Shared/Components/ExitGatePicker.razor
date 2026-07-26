@@ -28,6 +28,7 @@
         {
           <div class="form-control border-0 p-0 ms-3">
               <select class="form-select" title="@typeof(ExitGate).GetTypeCaption()" @onchange=this.OnGateSelectedAsync id="targetGateSelect" autocomplete="off">
+              <option value="" disabled selected="@(this.SelectedGate is null)">Select a gate</option>
               @foreach (var gate in this.Map?.ExitGates ?? [])
               {
                 <option value="@gate.GetId()" selected=@(object.Equals(this.SelectedGate, gate))>@typeof(Gate).GetTypeCaption(): @gate.ToString()</option>

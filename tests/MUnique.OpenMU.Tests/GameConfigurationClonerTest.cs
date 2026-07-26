@@ -5,6 +5,7 @@
 namespace MUnique.OpenMU.Tests;
 
 using System.Collections.Specialized;
+using MUnique.OpenMU.AttributeSystem;
 using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.DataModel.Configuration.Items;
 using MUnique.OpenMU.Persistence;
@@ -58,6 +59,15 @@ public class GameConfigurationClonerTest
         var itemDefinition = context.CreateNew<ItemDefinition>();
         itemDefinition.Name = "Leather Helm";
         source.Items.Add(itemDefinition);
+        var mapRequirementAttribute = context.CreateNew<AttributeDefinition>();
+        mapRequirementAttribute.Designation = "Map access";
+        source.Attributes.Add(mapRequirementAttribute);
+        var mapRequirement = context.CreateNew<AttributeRequirement>();
+        mapRequirement.Attribute = mapRequirementAttribute;
+        map.MapRequirements.Add(mapRequirement);
+        var itemPowerUp = context.CreateNew<ItemBasePowerUpDefinition>();
+        itemPowerUp.TargetAttribute = mapRequirementAttribute;
+        itemDefinition.BasePowerUpAttributes.Add(itemPowerUp);
         var itemSet = context.CreateNew<ItemSetGroup>();
         itemSet.Name = "Warrior";
         source.ItemSetGroups.Add(itemSet);
@@ -89,6 +99,8 @@ public class GameConfigurationClonerTest
             Assert.That(clonedMap.DropItemGroups.Single(), Is.SameAs(clonedDropGroup));
             Assert.That(clonedMap.TerrainData, Is.Not.SameAs(map.TerrainData));
             Assert.That(clonedMap.TerrainData, Is.EqualTo(map.TerrainData));
+            Assert.That(clonedMap.MapRequirements.Single().Attribute, Is.SameAs(clone.Attributes.Single()));
+            Assert.That(clone.Items.Single().BasePowerUpAttributes.Single().TargetAttribute, Is.SameAs(clone.Attributes.Single()));
             Assert.That(clone.ItemSetGroups.Single().Items.Single().Name, Is.EqualTo("Warrior Leather Helm"));
             Assert.That(clone.ItemSetGroups.Single().Items.Single().ItemDefinition, Is.SameAs(clone.Items.Single()));
             Assert.That(clone.Monsters.Single().Buffs.Single().MagicEffectDefinition, Is.Not.SameAs(buff.MagicEffectDefinition));

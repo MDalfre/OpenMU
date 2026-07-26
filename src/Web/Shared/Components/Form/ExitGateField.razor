@@ -20,7 +20,7 @@
     </div>
     @if (this._showPicker)
     {
-        <ExitGatePicker @bind-SelectedGate="@this.CurrentValue" />
+        <ExitGatePicker SelectedGate="@this.CurrentValue" SelectedGateChanged="@this.OnSelectedGateChangedAsync" />
     }
     
     <ValidationMessage For=@this.ValueExpression />
