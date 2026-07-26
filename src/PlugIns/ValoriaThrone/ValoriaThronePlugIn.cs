@@ -69,7 +69,15 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
         {
             field = value;
             var options = value ?? ValoriaThroneOptions.Default;
-            ValoriaThroneOptionsValidator.Validate(options);
+            try
+            {
+                ValoriaThroneOptionsValidator.Validate(options);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or TimeZoneNotFoundException or InvalidTimeZoneException)
+            {
+                options = ValoriaThroneOptions.Default;
+            }
+
             this._controller.Configure(options);
             this._admissionPolicy.Configure(options);
             this._scheduler.Configure(options);
