@@ -5,6 +5,7 @@
 namespace MUnique.OpenMU.PlugIns.ValoriaThrone;
 
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging.Abstractions;
 using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.DataModel.Entities;
 using MUnique.OpenMU.GameLogic;
@@ -24,10 +25,26 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
 {
     private const string Command = "/valoriathrone";
 
+    private static readonly ValoriaThroneRuntimeRegistry RuntimeRegistry = new();
+    private static readonly IValoriaThroneStateStore StateStore = new InMemoryValoriaThroneStateStore();
+    private static readonly IValoriaThroneMessenger Messenger = new ValoriaThroneMessenger();
+    private static readonly IValoriaThroneMapOperations SharedMapOperations = new ValoriaThroneMapOperations(RuntimeRegistry, NullLogger<ValoriaThroneMapOperations>.Instance);
+    private static readonly IValoriaThroneEventController SharedController = new ValoriaThroneEventController(RuntimeRegistry, SharedMapOperations, Messenger, StateStore, TimeProvider.System, NullLogger<ValoriaThroneEventController>.Instance);
+    private static readonly ValoriaThroneAdmissionPolicy SharedAdmissionPolicy = new(SharedController);
+    private static readonly ValoriaThroneScheduler SharedScheduler = new(TimeProvider.System);
+
     private readonly IValoriaThroneEventController _controller;
     private readonly IValoriaThroneMapOperations _mapOperations;
     private readonly ValoriaThroneAdmissionPolicy _admissionPolicy;
     private readonly ValoriaThroneScheduler _scheduler;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ValoriaThronePlugIn"/> class.
+    /// </summary>
+    public ValoriaThronePlugIn()
+        : this(SharedController, SharedMapOperations, SharedAdmissionPolicy, SharedScheduler)
+    {
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ValoriaThronePlugIn"/> class.
