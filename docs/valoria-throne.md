@@ -32,6 +32,14 @@ O plugin fica desabilitado por padrão. Cadastre uma configuração para `Valori
   "guardianSpawnX": 142,
   "guardianSpawnY": 126,
   "guardianDirection": 0,
+  "supportMonsters": [
+    {
+      "monsterId": 250,
+      "spawnX": 140,
+      "spawnY": 126,
+      "direction": 0
+    }
+  ],
   "schedule": {
     "enabled": true,
     "timeZone": "America/Sao_Paulo",
@@ -41,7 +49,11 @@ O plugin fica desabilitado por padrão. Cadastre uma configuração para `Valori
 }
 ```
 
-Valide que o servidor de evento tenha PvP habilitado, que o mapa e o monstro existam e que a posição configurada seja caminhável.
+Valide que o servidor de evento tenha PvP habilitado, que o mapa e todos os monstros existam e que cada posição configurada seja caminhável. Os itens de `supportMonsters` são criados junto com o Guardião e removidos no encerramento, reset ou falha de spawn.
+
+## Avisos e contagem regressiva
+
+O início de cada etapa informa sua duração. Enquanto uma etapa estiver ativa, o servidor anuncia o tempo restante a cada minuto e também aos 30 e 10 segundos finais. As etapas cobertas são anúncio, preparação, inscrição, batalha, disponibilidade da coroa e cooldown.
 
 ## Regras de acesso
 

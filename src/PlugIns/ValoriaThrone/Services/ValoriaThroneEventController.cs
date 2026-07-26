@@ -28,6 +28,10 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     private DateTimeOffset? _nextTransitionAt;
     private ushort? _guardianId;
     private int _administratorStartRequested;
+    private int? _lastCountdownMinute;
+    private int _currentStageDurationSeconds;
+    private bool _announcedThirtySeconds;
+    private bool _announcedTenSeconds;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ValoriaThroneEventController"/> class.
@@ -95,12 +99,12 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             this._eventInstanceId = eventInstanceId;
             this._guardianId = null;
             this.State = ValoriaThroneEventState.Announcing;
-            this._nextTransitionAt = this._timeProvider.GetUtcNow().Add(this._options.AnnouncementDuration);
+            this.SetNextTransition(this._options.AnnouncementDuration);
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
 
         this._logger.LogInformation("Valoria Throne {EventInstanceId} started by {Reason}.", eventInstanceId, reason);
-        await this.BroadcastAsync("O Trono de Valoria começará em breve.", cancellationToken).ConfigureAwait(false);
+        await this.BroadcastAsync($"O Trono de Valoria começará em {FormatDuration(this._options.AnnouncementDuration)}.", cancellationToken).ConfigureAwait(false);
         return true;
     }
 
@@ -139,9 +143,15 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
                     this._eventInstanceId = null;
                     this._guardianId = null;
                     this.State = this._options.Enabled ? ValoriaThroneEventState.Cooldown : ValoriaThroneEventState.Disabled;
-                    this._nextTransitionAt = this.State == ValoriaThroneEventState.Cooldown
-                        ? this._timeProvider.GetUtcNow().Add(this._options.CooldownDuration)
-                        : null;
+                    if (this.State == ValoriaThroneEventState.Cooldown)
+                    {
+                        this.SetNextTransition(this._options.CooldownDuration);
+                    }
+                    else
+                    {
+                        this._nextTransitionAt = null;
+                    }
+
                     await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
                     stopped = true;
                 }
@@ -150,6 +160,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             if (stopped)
             {
                 this._logger.LogInformation("Valoria Throne {EventInstanceId} stopped by {Reason}.", eventInstanceId, reason);
+                await this.BroadcastAsync($"Novo evento disponível em {FormatDuration(this._options.CooldownDuration)}.", cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -165,22 +176,39 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
 
         ValoriaThroneEventState state;
         Guid? eventInstanceId;
+        string? countdownMessage = null;
+        var isWaitingForTransition = false;
         using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
         {
             if (this._nextTransitionAt is { } nextTransitionAt && nextTransitionAt > this._timeProvider.GetUtcNow())
             {
-                return;
+                countdownMessage = this.GetCountdownMessage(this.State, nextTransitionAt - this._timeProvider.GetUtcNow());
+                state = this.State;
+                eventInstanceId = this._eventInstanceId;
+                isWaitingForTransition = true;
             }
-
-            state = this.State;
-            eventInstanceId = this._eventInstanceId;
-            if (state == ValoriaThroneEventState.Cooldown)
+            else
             {
-                this.State = ValoriaThroneEventState.Idle;
-                this._nextTransitionAt = null;
-                await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
-                return;
+                state = this.State;
+                eventInstanceId = this._eventInstanceId;
+                if (state == ValoriaThroneEventState.Cooldown)
+                {
+                    this.State = ValoriaThroneEventState.Idle;
+                    this._nextTransitionAt = null;
+                    await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+                    countdownMessage = "O Trono de Valoria está disponível para um novo evento.";
+                }
             }
+        }
+
+        if (countdownMessage is not null)
+        {
+            await this.BroadcastAsync(countdownMessage, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (isWaitingForTransition)
+        {
+            return;
         }
 
         if (eventInstanceId is null)
@@ -248,13 +276,13 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
 
             eventInstanceId = currentEventInstanceId;
             this.State = ValoriaThroneEventState.CrownAvailable;
-            this._nextTransitionAt = this._timeProvider.GetUtcNow().Add(this._options.CrownPhaseDuration);
+            this.SetNextTransition(this._options.CrownPhaseDuration);
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
 
         var killerName = killed.LastDeath?.KillerName ?? "Um aventureiro";
         this._logger.LogInformation("Valoria guardian {GuardianId} was defeated during {EventInstanceId} by {KillerName}.", killed.Id, eventInstanceId, killerName);
-        await this.BroadcastAsync($"{killer?.GetName() ?? "Um aventureiro"} derrotou o Guardião do Trono.", cancellationToken).ConfigureAwait(false);
+        await this.BroadcastAsync($"{killer?.GetName() ?? "Um aventureiro"} derrotou o Guardião do Trono. A coroa estará disponível por {FormatDuration(this._options.CrownPhaseDuration)}.", cancellationToken).ConfigureAwait(false);
         return true;
     }
 
@@ -262,13 +290,13 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     {
         await this._mapOperations.PrepareAsync(eventInstanceId, cancellationToken).ConfigureAwait(false);
         await this.TransitionAsync(eventInstanceId, ValoriaThroneEventState.Announcing, ValoriaThroneEventState.Preparing, this._options.PreparationDuration, cancellationToken).ConfigureAwait(false);
-        await this.BroadcastAsync("Valley of Loren foi fechado para preparação.", cancellationToken).ConfigureAwait(false);
+        await this.BroadcastAsync($"Valley of Loren foi fechado para preparação. Duração: {FormatDuration(this._options.PreparationDuration)}.", cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask OpenRegistrationAsync(Guid eventInstanceId, CancellationToken cancellationToken)
     {
         await this.TransitionAsync(eventInstanceId, ValoriaThroneEventState.Preparing, ValoriaThroneEventState.RegistrationOpen, this._options.RegistrationDuration, cancellationToken).ConfigureAwait(false);
-        await this.BroadcastAsync("As entradas para o Trono de Valoria estão abertas no servidor PvP.", cancellationToken).ConfigureAwait(false);
+        await this.BroadcastAsync($"As entradas para o Trono de Valoria estão abertas no server {(this._options.EventServerId ?? 0) + 1}. Duração: {FormatDuration(this._options.RegistrationDuration)}.", cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask StartBattleAsync(Guid eventInstanceId, CancellationToken cancellationToken)
@@ -283,11 +311,11 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
 
             this._guardianId = guardianId;
             this.State = ValoriaThroneEventState.InProgress;
-            this._nextTransitionAt = this._timeProvider.GetUtcNow().Add(this._options.BattleDuration);
+            this.SetNextTransition(this._options.BattleDuration);
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await this.BroadcastAsync("O Guardião do Trono despertou.", cancellationToken).ConfigureAwait(false);
+        await this.BroadcastAsync($"O Guardião do Trono despertou com {this._options.SupportMonsters.Count} mobs de apoio. Duração da batalha: {FormatDuration(this._options.BattleDuration)}.", cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask TransitionAsync(Guid eventInstanceId, ValoriaThroneEventState expectedState, ValoriaThroneEventState nextState, TimeSpan duration, CancellationToken cancellationToken)
@@ -300,9 +328,71 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             }
 
             this.State = nextState;
-            this._nextTransitionAt = this._timeProvider.GetUtcNow().Add(duration);
+            this.SetNextTransition(duration);
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private void SetNextTransition(TimeSpan duration)
+    {
+        this._nextTransitionAt = this._timeProvider.GetUtcNow().Add(duration);
+        this._currentStageDurationSeconds = (int)Math.Ceiling(duration.TotalSeconds);
+        this._lastCountdownMinute = this._currentStageDurationSeconds > 0
+            ? (int)Math.Ceiling(duration.TotalMinutes)
+            : null;
+        this._announcedThirtySeconds = false;
+        this._announcedTenSeconds = false;
+    }
+
+    private string? GetCountdownMessage(ValoriaThroneEventState state, TimeSpan remaining)
+    {
+        var remainingSeconds = Math.Max(0, (int)Math.Ceiling(remaining.TotalSeconds));
+        var remainingMinutes = (int)Math.Ceiling(remaining.TotalMinutes);
+        if (remainingMinutes > 0 && remainingMinutes < this._lastCountdownMinute)
+        {
+            this._lastCountdownMinute = remainingMinutes;
+            return this.CreateCountdownMessage(state, TimeSpan.FromSeconds(remainingSeconds));
+        }
+
+        if (remainingSeconds <= 10 && this._currentStageDurationSeconds > 10 && !this._announcedTenSeconds)
+        {
+            this._announcedTenSeconds = true;
+            return this.CreateCountdownMessage(state, TimeSpan.FromSeconds(remainingSeconds));
+        }
+
+        if (remainingSeconds is > 10 and <= 30 && this._currentStageDurationSeconds > 30 && !this._announcedThirtySeconds)
+        {
+            this._announcedThirtySeconds = true;
+            return this.CreateCountdownMessage(state, TimeSpan.FromSeconds(remainingSeconds));
+        }
+
+        return null;
+    }
+
+    private string CreateCountdownMessage(ValoriaThroneEventState state, TimeSpan remaining)
+    {
+        var phase = state switch
+        {
+            ValoriaThroneEventState.Announcing => "O Trono de Valoria começará",
+            ValoriaThroneEventState.Preparing => "A preparação terminará",
+            ValoriaThroneEventState.RegistrationOpen => "As inscrições encerrarão",
+            ValoriaThroneEventState.InProgress => "A batalha terminará",
+            ValoriaThroneEventState.CrownAvailable => "A coroa deixará de estar disponível",
+            ValoriaThroneEventState.Cooldown => "O novo evento estará disponível",
+            _ => "A próxima etapa começará",
+        };
+        return $"{phase} em {FormatDuration(remaining)}.";
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        var seconds = Math.Max(0, (int)Math.Ceiling(duration.TotalSeconds));
+        var roundedDuration = TimeSpan.FromSeconds(seconds);
+        return roundedDuration.Hours > 0
+            ? $"{(int)roundedDuration.TotalHours}h {roundedDuration.Minutes:D2}min"
+            : roundedDuration.Minutes > 0
+                ? $"{roundedDuration.Minutes}min {roundedDuration.Seconds:D2}s"
+                : $"{roundedDuration.Seconds}s";
     }
 
     private async ValueTask BroadcastAsync(string message, CancellationToken cancellationToken)

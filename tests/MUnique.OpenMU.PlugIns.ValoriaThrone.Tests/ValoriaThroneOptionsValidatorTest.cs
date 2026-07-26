@@ -66,4 +66,41 @@ public class ValoriaThroneOptionsValidatorTest
 
         Assert.DoesNotThrow(() => ValoriaThroneOptionsValidator.Validate(options));
     }
+
+    /// <summary>
+    /// Tests that each configured support monster requires a definition.
+    /// </summary>
+    [Test]
+    public void ValidateEnabledConfigurationWithSupportMonsterWithoutDefinitionThrows()
+    {
+        var options = new ValoriaThroneOptions
+        {
+            Enabled = true,
+            EventServerId = 1,
+            GuardianMonsterId = 1,
+            SupportMonsters = new List<ValoriaThroneSupportMonsterOptions> { new() },
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ValoriaThroneOptionsValidator.Validate(options));
+    }
+
+    /// <summary>
+    /// Tests that a configured support monster with a definition is accepted.
+    /// </summary>
+    [Test]
+    public void ValidateEnabledConfigurationWithSupportMonster()
+    {
+        var options = new ValoriaThroneOptions
+        {
+            Enabled = true,
+            EventServerId = 1,
+            GuardianMonsterId = 1,
+            SupportMonsters = new List<ValoriaThroneSupportMonsterOptions>
+            {
+                new() { MonsterId = 2 },
+            },
+        };
+
+        Assert.DoesNotThrow(() => ValoriaThroneOptionsValidator.Validate(options));
+    }
 }

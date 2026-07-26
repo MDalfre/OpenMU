@@ -63,6 +63,9 @@ public sealed class ValoriaThroneOptions
     /// <summary>Gets or sets the guardian direction.</summary>
     public byte GuardianDirection { get; set; }
 
+    /// <summary>Gets or sets the monsters which support the guardian during the battle.</summary>
+    public ICollection<ValoriaThroneSupportMonsterOptions> SupportMonsters { get; set; } = new List<ValoriaThroneSupportMonsterOptions>();
+
     /// <summary>Gets or sets the scheduling configuration.</summary>
     public ValoriaThroneScheduleOptions Schedule { get; set; } = new();
 

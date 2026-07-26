@@ -32,6 +32,14 @@ public static class ValoriaThroneOptionsValidator
             throw new InvalidOperationException($"{nameof(ValoriaThroneOptions.GuardianMonsterId)} is required when the event is enabled.");
         }
 
+        foreach (var supportMonster in options.SupportMonsters)
+        {
+            if (supportMonster.MonsterId <= 0)
+            {
+                throw new InvalidOperationException($"{nameof(ValoriaThroneSupportMonsterOptions.MonsterId)} is required for every support monster.");
+            }
+        }
+
         if (options.AnnouncementDuration < TimeSpan.Zero
             || options.PreparationDuration < TimeSpan.Zero
             || options.RegistrationDuration < TimeSpan.Zero

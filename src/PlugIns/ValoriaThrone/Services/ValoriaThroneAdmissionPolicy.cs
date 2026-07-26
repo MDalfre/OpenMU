@@ -50,7 +50,8 @@ public sealed class ValoriaThroneAdmissionPolicy
             return ValueTask.CompletedTask;
         }
 
-        var isAuthorizedServer = player.GameContext is IGameServerContext context && context.Id == this._options.EventServerId;
+        var eventServerId = this._options.EventServerId;
+        var isAuthorizedServer = player.GameContext is IGameServerContext context && context.Id == eventServerId;
         var allowed = state == ValoriaThroneEventState.RegistrationOpen && isAuthorizedServer
                       || state == ValoriaThroneEventState.InProgress && isAuthorizedServer && this._options.AllowLateEntry;
         if (allowed)
@@ -62,6 +63,11 @@ public sealed class ValoriaThroneAdmissionPolicy
         eventArgs.Message = isAuthorizedServer
             ? "Você não pode entrar em Valley of Loren neste momento."
             : "O evento está disponível apenas no servidor PvP.";
+        if (!isAuthorizedServer)
+        {
+            eventArgs.Message = $"O evento está disponível apenas no server {(eventServerId ?? 0) + 1}.";
+        }
+
         if (source == MapEntrySource.CharacterSelection)
         {
             var fallbackMap = player.GameContext.Configuration.Maps.FirstOrDefault(map => map.Number == this._options.FallbackMapId);
