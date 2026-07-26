@@ -1091,8 +1091,25 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
     /// Moves the player to the specified gate.
     /// </summary>
     /// <param name="gate">The gate to which the player should be moved.</param>
-    public async ValueTask WarpToAsync(ExitGate gate)
+    public ValueTask WarpToAsync(ExitGate gate) => this.WarpToAsync(gate, false);
+
+    /// <summary>
+    /// Moves the player to a gate after an optional admission validation.
+    /// </summary>
+    /// <param name="gate">The gate to which the player should be moved.</param>
+    /// <param name="mapEntryValidated">A value indicating whether the caller already validated map entry.</param>
+    internal async ValueTask WarpToAsync(ExitGate gate, bool mapEntryValidated)
     {
+        if (!mapEntryValidated)
+        {
+            var entryResult = await MapEntryValidator.ValidateAsync(this, gate.Map!, MapEntrySource.Internal).ConfigureAwait(false);
+            if (entryResult.Denied)
+            {
+                await this.ShowBlueMessageAsync(entryResult.Message ?? "You cannot enter this map at the moment.").ConfigureAwait(false);
+                return;
+            }
+        }
+
         var isRespawnOnSameMap = object.Equals(this.CurrentMap?.Definition, gate.Map);
         if (!await this.TryRemoveFromCurrentMapAsync(isRespawnOnSameMap).ConfigureAwait(false))
         {
@@ -1177,6 +1194,18 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
         else
         {
             this.CurrentMap = await this.GameContext.GetMapAsync(this.SelectedCharacter!.CurrentMap.Number.ToUnsigned()).ConfigureAwait(false);
+        }
+
+        var entryResult = await MapEntryValidator.ValidateAsync(this, this.CurrentMap!.Definition, MapEntrySource.CharacterSelection).ConfigureAwait(false);
+        if (entryResult.Denied && entryResult.RedirectGate is { } redirectGate)
+        {
+            await this.PlaceAtGateAsync(redirectGate).ConfigureAwait(false);
+            this.CurrentMap = await this.GameContext.GetMapAsync(redirectGate.Map!.Number.ToUnsigned()).ConfigureAwait(false);
+            await this.ShowBlueMessageAsync(entryResult.Message ?? "You cannot enter this map at the moment.").ConfigureAwait(false);
+        }
+        else if (entryResult.Denied)
+        {
+            throw new InvalidOperationException("The selected character was denied map entry without a redirect gate.");
         }
 
         await this.PlayerState.TryAdvanceToAsync(GameLogic.PlayerState.EnteredWorld).ConfigureAwait(false);

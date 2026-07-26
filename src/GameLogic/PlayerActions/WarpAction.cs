@@ -6,6 +6,7 @@ namespace MUnique.OpenMU.GameLogic.PlayerActions;
 
 using System.Diagnostics.CodeAnalysis;
 using MUnique.OpenMU.GameLogic.Attributes;
+using MUnique.OpenMU.GameLogic.PlugIns;
 using MUnique.OpenMU.GameLogic.Views;
 using MUnique.OpenMU.Interfaces;
 
@@ -21,47 +22,47 @@ public class WarpAction
     /// <param name="warpInfo">The warp information.</param>
     public async ValueTask WarpToAsync(Player player, WarpInfo warpInfo)
     {
-        if (this.CheckRequirements(player, warpInfo, out var errorMessage))
-        {
-            await player.WarpToAsync(warpInfo.Gate!).ConfigureAwait(false);
-        }
-        else
+        if (await this.CheckRequirementsAsync(player, warpInfo).ConfigureAwait(false) is { } errorMessage)
         {
             await player.ShowBlueMessageAsync(errorMessage).ConfigureAwait(false);
         }
+        else
+        {
+            await player.WarpToAsync(warpInfo.Gate!, true).ConfigureAwait(false);
+        }
     }
 
-    private bool CheckRequirements(Player player, WarpInfo warpInfo, [MaybeNullWhen(true)] out string errorMessage)
+    private async ValueTask<string?> CheckRequirementsAsync(Player player, WarpInfo warpInfo)
     {
-        errorMessage = null;
-
         var requirement = player.SelectedCharacter?.GetEffectiveMoveLevelRequirement(warpInfo.LevelRequirement);
         if (requirement > player.Attributes?[Stats.Level])
         {
-            errorMessage = $"You need to be level {requirement} in order to warp";
-            return false;
+            return $"You need to be level {requirement} in order to warp";
         }
 
         if (warpInfo.Gate?.Map is null)
         {
-            errorMessage = "The warp target is not initialized";
-            return false;
+            return "The warp target is not initialized";
         }
 
         if (warpInfo.Gate.Map.TryGetRequirementError(player, out var message))
         {
-            errorMessage = message;
-            return false;
+            return message;
+        }
+
+        var entryResult = await MapEntryValidator.ValidateAsync(player, warpInfo.Gate.Map, MapEntrySource.Warp).ConfigureAwait(false);
+        if (entryResult.Denied)
+        {
+            return entryResult.Message ?? "You cannot enter this map at the moment.";
         }
 
         // Money check should be last to avoid getting zen when other checks failed
         if (!this.CheckMoneyRequirement(player, warpInfo))
         {
-            errorMessage = $"You need {warpInfo.Costs} in order to warp";
-            return false;
+            return $"You need {warpInfo.Costs} in order to warp";
         }
 
-        return true;
+        return null;
     }
 
     private bool CheckMoneyRequirement(Player player, WarpInfo warpInfo)

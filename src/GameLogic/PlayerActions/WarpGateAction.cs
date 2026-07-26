@@ -5,6 +5,7 @@
 namespace MUnique.OpenMU.GameLogic.PlayerActions;
 
 using MUnique.OpenMU.GameLogic.Attributes;
+using MUnique.OpenMU.GameLogic.PlugIns;
 using MUnique.OpenMU.GameLogic.Views.World;
 using MUnique.OpenMU.Pathfinding;
 
@@ -22,7 +23,7 @@ public class WarpGateAction
     {
         if (await this.IsWarpLegitAsync(player, gate).ConfigureAwait(false))
         {
-            await player.WarpToAsync(gate.TargetGate!).ConfigureAwait(false);
+            await player.WarpToAsync(gate.TargetGate!, true).ConfigureAwait(false);
         }
         else
         {
@@ -52,6 +53,13 @@ public class WarpGateAction
         if (enterGate.TargetGate.Map.TryGetRequirementError(player, out var errorMessage))
         {
             await player.ShowBlueMessageAsync(errorMessage).ConfigureAwait(false);
+            return false;
+        }
+
+        var entryResult = await MapEntryValidator.ValidateAsync(player, enterGate.TargetGate.Map, MapEntrySource.Gate).ConfigureAwait(false);
+        if (entryResult.Denied)
+        {
+            await player.ShowBlueMessageAsync(entryResult.Message ?? "You cannot enter this map at the moment.").ConfigureAwait(false);
             return false;
         }
 

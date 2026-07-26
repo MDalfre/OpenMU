@@ -238,6 +238,7 @@ internal sealed class Program : IDisposable
         _ = GameLogic.Rand.NextInt(1, 2);
         _ = DataInitialization.Id;
         _ = OpenMU.GameServer.ClientVersionResolver.DefaultVersion;
+        _ = typeof(PlugIns.ValoriaThrone.ValoriaThronePlugIn);
 
         var addAdminPanel = this.IsAdminPanelEnabled(args);
         await new ConfigFileDatabaseConnectionStringProvider().InitializeAsync(default).ConfigureAwait(false);
@@ -256,6 +257,7 @@ internal sealed class Program : IDisposable
             .AddSingleton<ConfigurationChangeMediator>()
             .AddSingleton<IConfigurationChangeMediator>(s => s.GetRequiredService<ConfigurationChangeMediator>())
             .AddSingleton<IConfigurationChangeMediatorListener>(s => s.GetRequiredService<ConfigurationChangeMediator>())
+            .AddValoriaThrone()
             .AddSingleton(s => this.CreateIpResolver(s, args))
             .AddSingleton(this._gameServers)
             .AddSingleton(this._gameServers.Values)
