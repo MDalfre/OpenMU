@@ -76,7 +76,7 @@ public sealed class ValoriaThroneMapOperations : IValoriaThroneMapOperations
 
         var map = await context.GetMapAsync(this._options.EventMapId).ConfigureAwait(false)
                   ?? throw new InvalidOperationException($"Event map {this._options.EventMapId} was not found.");
-        var monsterDefinition = context.Configuration.Monsters.FirstOrDefault(monster => monster.Number == this._options.GuardianMonsterId)
+        var monsterDefinition = context.Configuration.Monsters.FirstOrDefault(monster => monster.Number == (ushort)this._options.GuardianMonsterId)
                                 ?? throw new InvalidOperationException($"Guardian definition {this._options.GuardianMonsterId} was not found.");
         if (!map.Terrain.WalkMap[this._options.GuardianSpawnX, this._options.GuardianSpawnY])
         {

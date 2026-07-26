@@ -52,7 +52,7 @@ public sealed class ValoriaThroneOptions
     public bool AllowGameMasterBypass { get; set; }
 
     /// <summary>Gets or sets the guardian monster definition identifier.</summary>
-    public ushort GuardianMonsterId { get; set; }
+    public short GuardianMonsterId { get; set; }
 
     /// <summary>Gets or sets the guardian spawn x coordinate.</summary>
     public byte GuardianSpawnX { get; set; }
