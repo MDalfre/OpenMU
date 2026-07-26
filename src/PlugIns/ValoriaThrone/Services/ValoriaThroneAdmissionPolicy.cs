@@ -40,7 +40,7 @@ public sealed class ValoriaThroneAdmissionPolicy
         }
 
         var state = this._controller.State;
-        if (state == ValoriaThroneEventState.Idle)
+        if (state is ValoriaThroneEventState.Idle or ValoriaThroneEventState.Cooldown)
         {
             return ValueTask.CompletedTask;
         }
