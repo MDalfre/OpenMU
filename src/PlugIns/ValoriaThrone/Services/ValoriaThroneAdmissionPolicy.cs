@@ -34,6 +34,11 @@ public sealed class ValoriaThroneAdmissionPolicy
     /// <summary>Validates a map entry attempt.</summary>
     public async ValueTask ValidateAsync(Player player, GameMapDefinition targetMap, MapEntrySource source, MapEntryValidationEventArgs eventArgs)
     {
+        if (source == MapEntrySource.Gate && player.CurrentMap?.Definition.Number == targetMap.Number)
+        {
+            return;
+        }
+
         if (this._controller.IsCrownHolder(player))
         {
             if (targetMap.Number != this._options.EventMapId)
@@ -43,10 +48,6 @@ public sealed class ValoriaThroneAdmissionPolicy
                 return;
             }
 
-            if (source == MapEntrySource.Gate)
-            {
-                return;
-            }
         }
 
         if (this._options.LandsOfTrials.Enabled && targetMap.Number == this._options.LandsOfTrials.MapId)

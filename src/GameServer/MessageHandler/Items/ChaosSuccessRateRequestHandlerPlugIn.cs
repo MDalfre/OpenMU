@@ -21,7 +21,6 @@ internal sealed class ChaosSuccessRateRequestHandlerPlugIn : IPacketHandlerPlugI
     private const byte PacketCode = 0xFA;
     private const int RequestLength = 5;
     private const int ResponseLength = 7;
-    private const ushort RateUnavailable = ushort.MaxValue;
     private readonly ItemCraftAction _craftAction = new();
 
     /// <inheritdoc />
@@ -40,9 +39,7 @@ internal sealed class ChaosSuccessRateRequestHandlerPlugIn : IPacketHandlerPlugI
 
         var revision = BinaryPrimitives.ReadUInt16LittleEndian(packet.Span[3..]);
         var result = this._craftAction.CalculateSuccessRate(player);
-        var effectiveRateBasisPoints = result is null
-            ? RateUnavailable
-            : (ushort)Math.Clamp(Math.Round(result.EffectiveRate * 100), ushort.MinValue, 10000);
+        var effectiveRateBasisPoints = (ushort)Math.Clamp(Math.Round((result?.EffectiveRate ?? 0.0) * 100), ushort.MinValue, 10000);
 
         await connection.SendAsync(WriteResponse).ConfigureAwait(false);
         int WriteResponse()

@@ -56,11 +56,14 @@ public class WarpGateAction
             return false;
         }
 
-        var entryResult = await MapEntryValidator.ValidateAsync(player, enterGate.TargetGate.Map, MapEntrySource.Gate).ConfigureAwait(false);
-        if (entryResult.Denied)
+        if (player.CurrentMap?.Definition.Number != enterGate.TargetGate.Map.Number)
         {
-            await player.ShowBlueMessageAsync(entryResult.Message ?? "You cannot enter this map at the moment.").ConfigureAwait(false);
-            return false;
+            var entryResult = await MapEntryValidator.ValidateAsync(player, enterGate.TargetGate.Map, MapEntrySource.Gate).ConfigureAwait(false);
+            if (entryResult.Denied)
+            {
+                await player.ShowBlueMessageAsync(entryResult.Message ?? "You cannot enter this map at the moment.").ConfigureAwait(false);
+                return false;
+            }
         }
 
         var currentPosition = player.IsWalking ? player.WalkTarget : player.Position;

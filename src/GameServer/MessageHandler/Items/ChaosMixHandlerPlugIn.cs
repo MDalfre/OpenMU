@@ -32,20 +32,25 @@ internal class ChaosMixHandlerPlugIn : IPacketHandlerPlugIn
     {
         ChaosMachineMixRequest message = packet;
 
-        byte? preferredMixType = null;
-        if (packet.Length != 3)
+        byte mixType;
+        if (packet.Length == 3)
         {
-            preferredMixType = (byte)message.MixType;
-        }
+            // Older versions (e.g. 0.75, 0.95d) don't provide a mix type identifier, so we have to infer the item crafting
+            var crafting = this._mixAction.FindAppropriateCraftingByItems(player);
+            if (crafting is null)
+            {
+                await player.InvokeViewPlugInAsync<IShowItemCraftingResultPlugIn>(p => p.ShowResultAsync(CraftingResult.IncorrectMixItems, null)).ConfigureAwait(false);
+                return;
+            }
 
-        var crafting = this._mixAction.FindAppropriateCraftingByItems(player, preferredMixType);
-        if (crafting is null)
+            mixType = crafting.Number;
+        }
+        else
         {
-            await player.InvokeViewPlugInAsync<IShowItemCraftingResultPlugIn>(p => p.ShowResultAsync(CraftingResult.IncorrectMixItems, null)).ConfigureAwait(false);
-            return;
+            mixType = (byte)message.MixType;
         }
 
         var socketSlot = packet.Length > 4 ? message.SocketSlot : (byte)0;
-        await this._mixAction.MixItemsAsync(player, crafting.Number, socketSlot).ConfigureAwait(false);
+        await this._mixAction.MixItemsAsync(player, mixType, socketSlot).ConfigureAwait(false);
     }
 }
