@@ -75,7 +75,7 @@ public class ItemCraftAction
                     this._craftingHandlerCache.Add(itemCrafting, craftingHandler);
                 }
 
-                if (craftingHandler.TryGetRequiredItems(player, out _, out _) is null)
+                if (this.TryGetRequiredItemsSilently(craftingHandler, player) is null)
                 {
                     return itemCrafting;
                 }
@@ -103,6 +103,13 @@ public class ItemCraftAction
         }
 
         return craftingHandler;
+    }
+
+    private CraftingResult? TryGetRequiredItemsSilently(IItemCraftingHandler craftingHandler, Player player)
+    {
+        return craftingHandler is SimpleItemCraftingHandler simpleCraftingHandler
+            ? simpleCraftingHandler.TryGetRequiredItems(player, out _, out _, reportInvalidMix: false)
+            : craftingHandler.TryGetRequiredItems(player, out _, out _);
     }
 
     private IItemCraftingHandler CreateCraftingHandler(ItemCrafting crafting)

@@ -29,6 +29,19 @@ public class SimpleItemCraftingHandler : BaseItemCraftingHandler
     /// <inheritdoc />
     public override CraftingResult? TryGetRequiredItems(Player player, out IList<CraftingRequiredItemLink> items, out byte successRate)
     {
+        return this.TryGetRequiredItems(player, out items, out successRate, reportInvalidMix: true);
+    }
+
+    /// <summary>
+    /// Checks the configured requirements without necessarily reporting an invalid mix as suspicious.
+    /// </summary>
+    /// <param name="player">The player whose temporary storage is checked.</param>
+    /// <param name="items">The items required by the crafting.</param>
+    /// <param name="successRate">The calculated success rate.</param>
+    /// <param name="reportInvalidMix">Whether invalid requirements should be logged as suspicious.</param>
+    /// <returns>The failure result, or <see langword="null"/> when the requirements match.</returns>
+    internal CraftingResult? TryGetRequiredItems(Player player, out IList<CraftingRequiredItemLink> items, out byte successRate, bool reportInvalidMix)
+    {
         successRate = 0;
         int rate = this._settings.SuccessPercent;
         long totalCraftingPrice = 0;
@@ -40,13 +53,21 @@ public class SimpleItemCraftingHandler : BaseItemCraftingHandler
             var itemCount = foundItems.Sum(i => i.IsStackable() ? i.Durability : 1);
             if (itemCount < requiredItem.MinimumAmount)
             {
-                player.Logger.LogWarning("LackingMixItems: Suspicious action for player with name: {0}, could be hack attempt. Missing item(s): {1}", player.Name, requiredItem);
+                if (reportInvalidMix)
+                {
+                    player.Logger.LogWarning("LackingMixItems: Suspicious action for player with name: {0}, could be hack attempt. Missing item(s): {1}", player.Name, requiredItem);
+                }
+
                 return CraftingResult.LackingMixItems;
             }
 
             if (itemCount > requiredItem.MaximumAmount && requiredItem.MaximumAmount > 0)
             {
-                player.Logger.LogWarning("TooManyItems: Suspicious action for player with name: {0}, could be hack attempt. ItemCount: {1}, Required: {2}", player.Name, itemCount, requiredItem);
+                if (reportInvalidMix)
+                {
+                    player.Logger.LogWarning("TooManyItems: Suspicious action for player with name: {0}, could be hack attempt. ItemCount: {1}, Required: {2}", player.Name, itemCount, requiredItem);
+                }
+
                 return CraftingResult.TooManyItems;
             }
 

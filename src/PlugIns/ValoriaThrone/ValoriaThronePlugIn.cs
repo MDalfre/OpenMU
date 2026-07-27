@@ -198,6 +198,11 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
     /// <inheritdoc />
     public async ValueTask PlayerStateChangedAsync(Player player, State previousState, State currentState)
     {
+        if (previousState == PlayerState.EnteredWorld && currentState == PlayerState.CharacterSelection)
+        {
+            await this._controller.HandleCrownHolderLostAsync(player, "O Portador da Coroa saiu do campo de batalha.", CancellationToken.None).ConfigureAwait(false);
+        }
+
         if (previousState != PlayerState.CharacterSelection || currentState != PlayerState.EnteredWorld || this._controller.ActiveReign is not { SelectedEra: not ImperialEra.None } reign)
         {
             return;
@@ -258,12 +263,6 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
     /// <inheritdoc />
     public async ValueTask ObjectRemovedFromMapAsync(GameMap map, ILocateable removedObject)
     {
-        if (removedObject is Player player)
-        {
-            await this._controller.HandleCrownHolderLostAsync(player, "O Portador da Coroa desapareceu do campo de batalha.", CancellationToken.None).ConfigureAwait(false);
-            return;
-        }
-
         if (removedObject is NonPlayerCharacter npc)
         {
             await this._controller.HandleSeniorRemovedAsync(npc, CancellationToken.None).ConfigureAwait(false);
