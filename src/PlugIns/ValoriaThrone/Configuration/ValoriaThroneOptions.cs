@@ -4,6 +4,9 @@
 
 namespace MUnique.OpenMU.PlugIns.ValoriaThrone.Configuration;
 
+using System.ComponentModel.DataAnnotations;
+using MUnique.OpenMU.DataModel.Composition;
+
 /// <summary>
 /// Configures the Valoria Throne event.
 /// </summary>
@@ -64,6 +67,8 @@ public sealed class ValoriaThroneOptions
     public byte GuardianDirection { get; set; }
 
     /// <summary>Gets or sets the monsters which support the guardian during the battle.</summary>
+    [MemberOfAggregate]
+    [ScaffoldColumn(true)]
     public ICollection<ValoriaThroneSupportMonsterOptions> SupportMonsters { get; set; } = new List<ValoriaThroneSupportMonsterOptions>();
 
     /// <summary>Gets or sets the scheduling configuration.</summary>
