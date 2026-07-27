@@ -34,11 +34,19 @@ public sealed class ValoriaThroneAdmissionPolicy
     /// <summary>Validates a map entry attempt.</summary>
     public async ValueTask ValidateAsync(Player player, GameMapDefinition targetMap, MapEntrySource source, MapEntryValidationEventArgs eventArgs)
     {
-        if (this._controller.IsCrownHolder(player) && targetMap.Number != this._options.EventMapId)
+        if (this._controller.IsCrownHolder(player))
         {
-            eventArgs.Denied = true;
-            eventArgs.Message = "O Portador da Coroa nÃ£o pode deixar Valley of Loren.";
-            return;
+            if (targetMap.Number != this._options.EventMapId)
+            {
+                eventArgs.Denied = true;
+                eventArgs.Message = "O Portador da Coroa nÃ£o pode deixar Valley of Loren.";
+                return;
+            }
+
+            if (source == MapEntrySource.Gate)
+            {
+                return;
+            }
         }
 
         if (this._options.LandsOfTrials.Enabled && targetMap.Number == this._options.LandsOfTrials.MapId)

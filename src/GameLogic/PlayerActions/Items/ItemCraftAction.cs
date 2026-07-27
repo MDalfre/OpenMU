@@ -60,14 +60,19 @@ public class ItemCraftAction
     /// Finds the relevant <see cref="ItemCrafting"/> by testing the mix items against every crafting's item requirements.
     /// </summary>
     /// <param name="player">The player.</param>
+    /// <param name="preferredCraftingNumber">The crafting number requested by the client, if available.</param>
     /// <returns>The relevant <see cref="ItemCrafting"/>.</returns>
-    public ItemCrafting? FindAppropriateCraftingByItems(Player player)
+    public ItemCrafting? FindAppropriateCraftingByItems(Player player, byte? preferredCraftingNumber = null)
     {
         if (player.OpenedNpc?.Definition is { } npc)
         {
             // Wing crafting is similar but has one extra requirement (chaos weapon) than
-            // chaos weapon crafting, so we set a descending order so it gets get checked first
-            foreach (var itemCrafting in npc.ItemCraftings.OrderByDescending(c => c.Number))
+            // chaos weapon crafting, so we set a descending order so it gets checked first.
+            // When the client provides a mix type, we test it first but still fall back to
+            // the recipe which actually matches the server-side storage.
+            foreach (var itemCrafting in npc.ItemCraftings
+                         .OrderByDescending(c => c.Number == preferredCraftingNumber)
+                         .ThenByDescending(c => c.Number))
             {
                 if (!this._craftingHandlerCache.TryGetValue(itemCrafting, out var craftingHandler))
                 {
