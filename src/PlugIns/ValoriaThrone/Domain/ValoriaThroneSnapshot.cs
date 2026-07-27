@@ -11,4 +11,8 @@ public sealed record ValoriaThroneSnapshot(
     Guid? EventInstanceId,
     ValoriaThroneEventState State,
     DateTimeOffset? NextTransitionAt,
-    ushort? GuardianId);
+    ushort? GuardianId,
+    ushort? CrownGroundItemId,
+    Guid? CrownHolderCharacterId,
+    uint? CrownHolderGuildId,
+    DateTimeOffset? CoronationEndsAt);

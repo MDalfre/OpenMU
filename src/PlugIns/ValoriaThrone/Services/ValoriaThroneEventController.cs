@@ -5,7 +5,11 @@
 namespace MUnique.OpenMU.PlugIns.ValoriaThrone.Services;
 
 using Microsoft.Extensions.Logging;
+using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.GameLogic;
+using MUnique.OpenMU.GameLogic.NPC;
+using MUnique.OpenMU.GameLogic.Views.World;
+using MUnique.OpenMU.Pathfinding;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Configuration;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Domain;
 using Nito.AsyncEx;
@@ -27,6 +31,12 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     private Guid? _eventInstanceId;
     private DateTimeOffset? _nextTransitionAt;
     private ushort? _guardianId;
+    private ValoriaCrownContext? _crown;
+    private Player? _crownCarrier;
+    private DateTimeOffset? _crownRespawnAt;
+    private Player? _coronationCandidate;
+    private NonPlayerCharacter? _coronationSenior;
+    private ImperialReign? _activeReign;
     private int _administratorStartRequested;
     private int? _lastCountdownMinute;
     private int _currentStageDurationSeconds;
@@ -57,10 +67,14 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     public ValoriaThroneEventState State { get; private set; }
 
     /// <inheritdoc />
+    public ImperialReign? ActiveReign => this._activeReign;
+
+    /// <inheritdoc />
     public void Configure(ValoriaThroneOptions options)
     {
         ValoriaThroneOptionsValidator.Validate(options);
         this._options = options;
+        this._activeReign = options.ImperialReign?.ExpiresAt > this._timeProvider.GetUtcNow() ? options.ImperialReign : null;
         this._mapOperations.Configure(options);
         if (!options.Enabled)
         {
@@ -98,6 +112,11 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             eventInstanceId = Guid.NewGuid();
             this._eventInstanceId = eventInstanceId;
             this._guardianId = null;
+            this._crown = null;
+            this._crownCarrier = null;
+            this._crownRespawnAt = null;
+            this._coronationCandidate = null;
+            this._coronationSenior = null;
             this.State = ValoriaThroneEventState.Announcing;
             this.SetNextTransition(this._options.AnnouncementDuration);
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
@@ -112,6 +131,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     public async ValueTask StopAsync(ValoriaThroneStopReason reason, CancellationToken cancellationToken)
     {
         Guid? eventInstanceId;
+        Player? crownCarrier;
         using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
         {
             eventInstanceId = this._eventInstanceId;
@@ -122,10 +142,16 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
 
             this.State = ValoriaThroneEventState.Finishing;
             this._nextTransitionAt = null;
+            this._crownRespawnAt = null;
+            this._coronationCandidate = null;
+            this._coronationSenior = null;
+            crownCarrier = this._crownCarrier;
+            this._crownCarrier = null;
         }
 
         try
         {
+            await this.SetCrownCarrierMarkerAsync(crownCarrier, false).ConfigureAwait(false);
             await this._mapOperations.CleanupAsync(eventInstanceId, cancellationToken).ConfigureAwait(false);
             await this.BroadcastAsync("A batalha terminou.", cancellationToken).ConfigureAwait(false);
         }
@@ -142,6 +168,9 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
                 {
                     this._eventInstanceId = null;
                     this._guardianId = null;
+                    this._crown = null;
+                    this._coronationCandidate = null;
+                    this._coronationSenior = null;
                     this.State = this._options.Enabled ? ValoriaThroneEventState.Cooldown : ValoriaThroneEventState.Disabled;
                     if (this.State == ValoriaThroneEventState.Cooldown)
                     {
@@ -168,6 +197,15 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     /// <inheritdoc />
     public async ValueTask TickAsync(CancellationToken cancellationToken)
     {
+        if (this._activeReign?.ExpiresAt <= this._timeProvider.GetUtcNow())
+        {
+            this._activeReign = null;
+            this._options.ImperialReign = null;
+            await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
+            await this._mapOperations.EvacuateLandsOfTrialsAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await this.SelectDefaultEraIfDueAsync(cancellationToken).ConfigureAwait(false);
         if (Interlocked.Exchange(ref this._administratorStartRequested, 0) == 1)
         {
             await this.StartAsync(ValoriaThroneStartReason.Administrator, cancellationToken).ConfigureAwait(false);
@@ -178,14 +216,39 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         Guid? eventInstanceId;
         string? countdownMessage = null;
         var isWaitingForTransition = false;
+        var crownDeliveryExpired = false;
+        var crownRespawnDue = false;
+        var coronationCompleted = false;
+        var coronationInterrupted = false;
         using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (this._nextTransitionAt is { } nextTransitionAt && nextTransitionAt > this._timeProvider.GetUtcNow())
+            var now = this._timeProvider.GetUtcNow();
+            if (this._nextTransitionAt is { } nextTransitionAt && nextTransitionAt > now)
             {
-                countdownMessage = this.GetCountdownMessage(this.State, nextTransitionAt - this._timeProvider.GetUtcNow());
                 state = this.State;
                 eventInstanceId = this._eventInstanceId;
-                isWaitingForTransition = true;
+                if (state == ValoriaThroneEventState.CrownCarried && this._crown?.DeliveryDeadline is { } deliveryDeadline && deliveryDeadline <= now)
+                {
+                    crownDeliveryExpired = true;
+                }
+                else if (state == ValoriaThroneEventState.CoronationInProgress && this._crown?.CoronationEndsAt is { } coronationEndsAt && coronationEndsAt <= now)
+                {
+                    coronationCompleted = true;
+                }
+                else if (state == ValoriaThroneEventState.CoronationInProgress && !this.IsCoronationCandidateValid())
+                {
+                    coronationInterrupted = true;
+                }
+                else if (state == ValoriaThroneEventState.CrownOnGround && this._crownRespawnAt is { } respawnAt && respawnAt <= now)
+                {
+                    this._crownRespawnAt = null;
+                    crownRespawnDue = true;
+                }
+                else
+                {
+                    countdownMessage = this.GetCountdownMessage(this.State, nextTransitionAt - now);
+                    isWaitingForTransition = true;
+                }
             }
             else
             {
@@ -204,6 +267,30 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         if (countdownMessage is not null)
         {
             await this.BroadcastAsync(countdownMessage, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (crownDeliveryExpired && eventInstanceId is { } expiredEventInstanceId)
+        {
+            await this.ReturnCrownAsync(expiredEventInstanceId, "O Portador nÃ£o conseguiu entregar a Coroa de Valoria a tempo.", cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (coronationCompleted && eventInstanceId is { } completedEventInstanceId)
+        {
+            await this.CompleteCoronationAsync(completedEventInstanceId, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (coronationInterrupted && eventInstanceId is { } interruptedEventInstanceId)
+        {
+            await this.ReturnCrownAsync(interruptedEventInstanceId, "A coroacao foi interrompida porque o candidato deixou a area do Senior.", cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (crownRespawnDue && eventInstanceId is { } respawnEventInstanceId)
+        {
+            await this.SpawnCrownAsync(respawnEventInstanceId, "A Coroa de Valoria retornou ao local da queda do GuardiÃ£o.", cancellationToken).ConfigureAwait(false);
+            return;
         }
 
         if (isWaitingForTransition)
@@ -227,15 +314,25 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             case ValoriaThroneEventState.RegistrationOpen:
                 await this.StartBattleAsync(eventInstanceId.Value, cancellationToken).ConfigureAwait(false);
                 break;
-            case ValoriaThroneEventState.InProgress:
-            case ValoriaThroneEventState.CrownAvailable:
+            case ValoriaThroneEventState.GuardianBattle:
+            case ValoriaThroneEventState.CrownOnGround:
+            case ValoriaThroneEventState.CrownCarried:
+            case ValoriaThroneEventState.CoronationInProgress:
                 await this.StopAsync(ValoriaThroneStopReason.Timeout, cancellationToken).ConfigureAwait(false);
                 break;
         }
     }
 
     /// <inheritdoc />
-    public ValoriaThroneSnapshot GetSnapshot() => new(this._eventInstanceId, this.State, this._nextTransitionAt, this._guardianId);
+    public ValoriaThroneSnapshot GetSnapshot() => new(
+        this._eventInstanceId,
+        this.State,
+        this._nextTransitionAt,
+        this._guardianId,
+        this._crown?.GroundItemId,
+        this._crown?.HolderCharacterId,
+        this._crown?.HolderGuildId,
+        this._crown?.CoronationEndsAt);
 
     /// <inheritdoc />
     public async ValueTask<bool> SpawnGuardianAsync(CancellationToken cancellationToken)
@@ -252,7 +349,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         }
 
         await this.StartBattleAsync(eventInstanceId, cancellationToken).ConfigureAwait(false);
-        return this.State == ValoriaThroneEventState.InProgress;
+        return this.State == ValoriaThroneEventState.GuardianBattle;
     }
 
     /// <summary>
@@ -268,21 +365,292 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
         {
             if (this._eventInstanceId is not { } currentEventInstanceId
-                || this.State != ValoriaThroneEventState.InProgress
+                || this.State != ValoriaThroneEventState.GuardianBattle
                 || !this._mapOperations.IsCurrentGuardian(killed, currentEventInstanceId))
             {
                 return false;
             }
 
             eventInstanceId = currentEventInstanceId;
-            this.State = ValoriaThroneEventState.CrownAvailable;
+            this.State = ValoriaThroneEventState.CrownOnGround;
+            this._crown = new ValoriaCrownContext
+            {
+                EventInstanceId = currentEventInstanceId,
+                OriginalDropPosition = killed.Position,
+            };
+            this._crownRespawnAt = null;
             this.SetNextTransition(this._options.CrownPhaseDuration);
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
 
         var killerName = killed.LastDeath?.KillerName ?? "Um aventureiro";
         this._logger.LogInformation("Valoria guardian {GuardianId} was defeated during {EventInstanceId} by {KillerName}.", killed.Id, eventInstanceId, killerName);
-        await this.BroadcastAsync($"{killer?.GetName() ?? "Um aventureiro"} derrotou o Guardião do Trono. A coroa estará disponível por {FormatDuration(this._options.CrownPhaseDuration)}.", cancellationToken).ConfigureAwait(false);
+        await this.SpawnCrownAsync(eventInstanceId, $"{killer?.GetName() ?? "Um aventureiro"} derrotou o Guardiao do Trono. A Coroa de Valoria caiu no campo de batalha e estara disponivel por {FormatDuration(this._options.CrownPhaseDuration)}.", cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<ValoriaCrownPickupResult> HandleCrownPickupAsync(Player player, DroppedItem droppedItem, CancellationToken cancellationToken)
+    {
+        string? rejectionMessage = null;
+        Guid eventInstanceId = Guid.Empty;
+        string? characterName = null;
+        uint guildId = 0;
+        using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (this._eventInstanceId is not { } currentEventInstanceId || !this._mapOperations.IsCurrentCrown(droppedItem, currentEventInstanceId))
+            {
+                return ValoriaCrownPickupResult.NotCrown;
+            }
+
+            if (this.State != ValoriaThroneEventState.CrownOnGround || this._crown is null || this._crown.GroundItemId != droppedItem.Id)
+            {
+                rejectionMessage = "A Coroa de Valoria ja nao esta disponivel.";
+            }
+            else if (!player.IsAlive)
+            {
+                rejectionMessage = "Voce precisa estar vivo para reivindicar a Coroa de Valoria.";
+            }
+            else if (player.IsTeleporting || player.CurrentMap?.Definition.Number != this._options.EventMapId)
+            {
+                rejectionMessage = "Voce precisa estar em Valley of Loren para reivindicar a Coroa de Valoria.";
+            }
+            else if (player.SelectedCharacter is null || player.GuildStatus is null)
+            {
+                rejectionMessage = "Voce precisa pertencer a uma guild para reivindicar a Coroa de Valoria.";
+            }
+            else if (this._nextTransitionAt is not { } deadline || deadline <= this._timeProvider.GetUtcNow())
+            {
+                rejectionMessage = "O prazo para reivindicar a Coroa de Valoria terminou.";
+            }
+            else
+            {
+                eventInstanceId = currentEventInstanceId;
+                characterName = player.SelectedCharacter.Name;
+                guildId = player.GuildStatus.GuildId;
+                this._crown.GroundItemId = null;
+                this._crown.HolderCharacterId = player.SelectedCharacter.Id;
+                this._crown.HolderCharacterName = characterName;
+                this._crown.HolderGuildId = guildId;
+                this._crown.HolderGuildName = $"Guild {guildId}";
+                this._crown.PickedUpAt = this._timeProvider.GetUtcNow();
+                this._crown.DeliveryDeadline = this._crown.PickedUpAt.Value.Add(this._options.CrownDeliveryDuration);
+                this._crownCarrier = player;
+                this.State = ValoriaThroneEventState.CrownCarried;
+                await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        if (rejectionMessage is not null)
+        {
+            await this._messenger.SendToPlayerAsync(player, rejectionMessage, cancellationToken).ConfigureAwait(false);
+            return ValoriaCrownPickupResult.Rejected;
+        }
+
+        await this._mapOperations.RemoveCrownAsync(eventInstanceId, cancellationToken).ConfigureAwait(false);
+        await this.SetCrownCarrierMarkerAsync(player, true).ConfigureAwait(false);
+        this._logger.LogInformation("Valoria crown of {EventInstanceId} was claimed by {HolderCharacterId} from runtime guild {HolderGuildId}.", eventInstanceId, player.SelectedCharacter!.Id, guildId);
+        await this.BroadcastAsync($"{characterName}, da guild {guildId}, tomou a Coroa de Valoria! O portador possui {FormatDuration(this._options.CrownDeliveryDuration)} para alcancar o Senior.", cancellationToken).ConfigureAwait(false);
+        return ValoriaCrownPickupResult.PickedUp;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<bool> HandleCrownHolderLostAsync(Player player, string reason, CancellationToken cancellationToken)
+    {
+        Guid eventInstanceId;
+        using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var crown = this._crown;
+            if (this._eventInstanceId is not { } currentEventInstanceId
+                || this.State is not (ValoriaThroneEventState.CrownCarried or ValoriaThroneEventState.CoronationInProgress)
+                || crown is null
+                || crown.HolderCharacterId != player.SelectedCharacter?.Id)
+            {
+                return false;
+            }
+
+            eventInstanceId = currentEventInstanceId;
+            crown.ClearHolder();
+            this._crownCarrier = null;
+            this.State = ValoriaThroneEventState.CrownOnGround;
+            this._crownRespawnAt = this._timeProvider.GetUtcNow().Add(this._options.CrownRespawnDelay);
+            this._coronationCandidate = null;
+            this._coronationSenior = null;
+            await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await this.SetCrownCarrierMarkerAsync(player, false).ConfigureAwait(false);
+        this._logger.LogInformation("Valoria crown holder {CharacterId} lost the crown during {EventInstanceId}: {Reason}.", player.SelectedCharacter?.Id, eventInstanceId, reason);
+        await this.BroadcastAsync($"{reason} A Coroa de Valoria retornara ao local da queda do Guardiao em {FormatDuration(this._options.CrownRespawnDelay)}.", cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public bool IsCrownHolder(Player player)
+    {
+        return (this.State is ValoriaThroneEventState.CrownCarried or ValoriaThroneEventState.CoronationInProgress)
+               && this._crown?.HolderCharacterId == player.SelectedCharacter?.Id;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<bool> CanEnterLandsOfTrialsAsync(Player player, CancellationToken cancellationToken)
+    {
+        var reign = this._activeReign;
+        if (!this._options.LandsOfTrials.Enabled || reign is null || player.GuildStatus is not { } guildStatus)
+        {
+            return false;
+        }
+
+        if (this._options.LandsOfTrials.AllowImperialGuild && guildStatus.GuildId == reign.ImperialGuildId)
+        {
+            return true;
+        }
+
+        return this._options.LandsOfTrials.AllowAlliances
+               && player.GameContext is IGameServerContext context
+               && await context.GuildServer.GetGuildRelationshipAsync(guildStatus.GuildId, reign.ImperialGuildId).ConfigureAwait(false) == MUnique.OpenMU.Interfaces.GuildRelationship.Union;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<bool> SelectEraAsync(Player player, ImperialEra era, CancellationToken cancellationToken)
+    {
+        var reign = this._activeReign;
+        if (era == ImperialEra.None || reign is null || reign.SelectedEra != ImperialEra.None || player.SelectedCharacter?.Id != reign.EmperorCharacterId)
+        {
+            return false;
+        }
+
+        reign.SelectedEra = era;
+        reign.EraSelectedAt = this._timeProvider.GetUtcNow();
+        await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        await this.BroadcastAsync($"O Imperador {reign.EmperorCharacterName}, da guild {reign.ImperialGuildName}, proclamou a {ImperialEraPresentation.GetName(era)}! {this.GetEraDescription(era)}", cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public string GetEraDescription(ImperialEra era) => ImperialEraPresentation.GetDescription(era, this._options.ImperialEras);
+
+    /// <inheritdoc />
+    public async ValueTask<ValoriaSeniorInteractionResult> HandleSeniorInteractionAsync(Player player, NonPlayerCharacter npc, CancellationToken cancellationToken)
+    {
+        if (npc.Definition.Number == this._options.SeniorNpcId
+            && npc.CurrentMap.Definition.Number == this._options.EventMapId
+            && this._activeReign is { SelectedEra: ImperialEra.None } reign
+            && player.SelectedCharacter?.Id == reign.EmperorCharacterId)
+        {
+            await this._messenger.SendToPlayerAsync(player, "Escolha a Era do reinado com /era Ascension, Fortune, Freedom ou Luck. A escolha é definitiva.", cancellationToken).ConfigureAwait(false);
+            return ValoriaSeniorInteractionResult.ConfirmationRequested;
+        }
+
+        if (npc.Definition.Number == this._options.LandsOfTrials.GatekeeperNpcId
+            && this.State is ValoriaThroneEventState.Idle or ValoriaThroneEventState.Cooldown)
+        {
+            if (!await this.CanEnterLandsOfTrialsAsync(player, cancellationToken).ConfigureAwait(false))
+            {
+                await this._messenger.SendToPlayerAsync(player, "Somente a Guild Imperial e suas alianças podem entrar em Lands of Trials.", cancellationToken).ConfigureAwait(false);
+                return ValoriaSeniorInteractionResult.Rejected;
+            }
+
+            var map = await player.GameContext.GetMapAsync(this._options.LandsOfTrials.MapId).ConfigureAwait(false);
+            if (map is null)
+            {
+                return ValoriaSeniorInteractionResult.Rejected;
+            }
+
+            await player.TeleportToMapAsync(map, new Point(this._options.LandsOfTrials.EntryPositionX, this._options.LandsOfTrials.EntryPositionY)).ConfigureAwait(false);
+            await this._messenger.SendToPlayerAsync(player, "A Guild Imperial controla Lands of Trials. Você recebeu permissão para entrar.", cancellationToken).ConfigureAwait(false);
+            return ValoriaSeniorInteractionResult.CoronationStarted;
+        }
+
+        if (npc.Definition.Number != this._options.SeniorNpcId || npc.CurrentMap.Definition.Number != this._options.EventMapId)
+        {
+            return ValoriaSeniorInteractionResult.NotSenior;
+        }
+
+        string message;
+        var startedCoronation = false;
+        using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var now = this._timeProvider.GetUtcNow();
+            if (this._eventInstanceId is null || this.State is ValoriaThroneEventState.Idle or ValoriaThroneEventState.Cooldown or ValoriaThroneEventState.Disabled)
+            {
+                message = "O Trono de Valoria aguarda um novo soberano.";
+            }
+            else if (this.State == ValoriaThroneEventState.GuardianBattle)
+            {
+                message = "Derrote o Guardiao e recupere a Coroa de Valoria.";
+            }
+            else if (this.State == ValoriaThroneEventState.CrownOnGround)
+            {
+                message = "A Coroa de Valoria aguarda um novo portador.";
+            }
+            else if (this.State == ValoriaThroneEventState.CoronationInProgress)
+            {
+                message = "A coroacao ja esta em andamento.";
+            }
+            else if (this.State != ValoriaThroneEventState.CrownCarried
+                     || this._crown is null
+                     || this._crown.HolderCharacterId != player.SelectedCharacter?.Id
+                     || this._crown.HolderGuildId != player.GuildStatus?.GuildId)
+            {
+                message = "Somente o Portador da Coroa pode reivindicar o Trono.";
+            }
+            else if (!this.IsValidCoronationPosition(player, npc))
+            {
+                message = "Voce precisa estar proximo ao Senior para entregar a Coroa de Valoria.";
+            }
+            else if (this._crown.ConfirmationRequestedAt is null
+                     || this._crown.SeniorObjectId != npc.Id
+                     || now - this._crown.ConfirmationRequestedAt > this._options.CoronationConfirmationDuration)
+            {
+                this._crown.SeniorObjectId = npc.Id;
+                this._crown.ConfirmationRequestedAt = now;
+                await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+                message = "Fale novamente com o Senior para confirmar a entrega da Coroa e iniciar a coroacao.";
+            }
+            else
+            {
+                this._crown.CoronationStartedAt = now;
+                this._crown.CoronationEndsAt = now.Add(this._options.CoronationDuration);
+                this._crown.ConfirmationRequestedAt = null;
+                this.State = ValoriaThroneEventState.CoronationInProgress;
+                this._coronationCandidate = player;
+                this._coronationSenior = npc;
+                await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+                message = $"A coroacao de {this._crown.HolderCharacterName}, da guild {this._crown.HolderGuildId}, comecou. Protejam o candidato por {FormatDuration(this._options.CoronationDuration)}.";
+                startedCoronation = true;
+            }
+        }
+
+        if (startedCoronation)
+        {
+            await this.BroadcastAsync(message, cancellationToken).ConfigureAwait(false);
+            return ValoriaSeniorInteractionResult.CoronationStarted;
+        }
+
+        await this._messenger.SendToPlayerAsync(player, message, cancellationToken).ConfigureAwait(false);
+        return message.StartsWith("Fale", StringComparison.Ordinal)
+            ? ValoriaSeniorInteractionResult.ConfirmationRequested
+            : ValoriaSeniorInteractionResult.Rejected;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<bool> HandleSeniorRemovedAsync(NonPlayerCharacter npc, CancellationToken cancellationToken)
+    {
+        Guid? eventInstanceId;
+        using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+        {
+            eventInstanceId = this.State == ValoriaThroneEventState.CoronationInProgress && ReferenceEquals(this._coronationSenior, npc)
+                ? this._eventInstanceId
+                : null;
+        }
+
+        if (eventInstanceId is not { } currentEventInstanceId)
+        {
+            return false;
+        }
+
+        await this.ReturnCrownAsync(currentEventInstanceId, "A coroacao foi interrompida porque o Senior desapareceu.", cancellationToken).ConfigureAwait(false);
         return true;
     }
 
@@ -310,12 +678,132 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             }
 
             this._guardianId = guardianId;
-            this.State = ValoriaThroneEventState.InProgress;
+            this.State = ValoriaThroneEventState.GuardianBattle;
             this.SetNextTransition(this._options.BattleDuration);
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
 
         await this.BroadcastAsync($"O Guardião do Trono despertou com {this._options.SupportMonsters.Count} mobs de apoio. Duração da batalha: {FormatDuration(this._options.BattleDuration)}.", cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask CompleteCoronationAsync(Guid eventInstanceId, CancellationToken cancellationToken)
+    {
+        string winnerMessage;
+        using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (this._eventInstanceId != eventInstanceId
+                || this.State != ValoriaThroneEventState.CoronationInProgress
+                || this._crown is null
+                || !this.IsCoronationCandidateValid())
+            {
+                return;
+            }
+
+            this._activeReign = new ImperialReign { Id = Guid.NewGuid(), EmperorCharacterId = this._crown.HolderCharacterId!.Value, EmperorCharacterName = this._crown.HolderCharacterName ?? string.Empty, ImperialGuildId = this._crown.HolderGuildId!.Value, ImperialGuildName = this._crown.HolderGuildName ?? string.Empty, StartedAt = this._timeProvider.GetUtcNow(), ExpiresAt = this._timeProvider.GetUtcNow().Add(this._options.ReignDuration) };
+            this._options.ImperialReign = this._activeReign;
+            winnerMessage = $"{this._activeReign.EmperorCharacterName}, da guild {this._activeReign.ImperialGuildName}, foi coroado Imperador de Valoria!";
+            this.State = ValoriaThroneEventState.Finishing;
+            this._nextTransitionAt = null;
+            await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        await this._mapOperations.EvacuateLandsOfTrialsAsync(cancellationToken).ConfigureAwait(false);
+
+        this._logger.LogInformation("Valoria coronation completed for {EventInstanceId}, character {HolderCharacterId}, runtime guild {HolderGuildId}.", eventInstanceId, this._crown?.HolderCharacterId, this._crown?.HolderGuildId);
+        await this.BroadcastAsync(winnerMessage, cancellationToken).ConfigureAwait(false);
+        await this.StopAsync(ValoriaThroneStopReason.Completed, cancellationToken).ConfigureAwait(false);
+    }
+
+    private bool IsCoronationCandidateValid()
+    {
+        return this._crown is not null
+               && this._coronationCandidate is { } candidate
+               && this._coronationSenior is { } senior
+               && this.IsValidCoronationPosition(candidate, senior)
+               && candidate.SelectedCharacter?.Id == this._crown.HolderCharacterId
+               && candidate.GuildStatus?.GuildId == this._crown.HolderGuildId;
+    }
+
+    private bool IsValidCoronationPosition(Player player, NonPlayerCharacter senior)
+    {
+        return player.IsAlive
+               && player.CurrentMap?.Definition.Number == this._options.EventMapId
+               && ReferenceEquals(player.CurrentMap, senior.CurrentMap)
+               && player.GetDistanceTo(senior) <= this._options.CoronationRadius;
+    }
+
+    private async ValueTask SpawnCrownAsync(Guid eventInstanceId, string announcement, CancellationToken cancellationToken)
+    {
+        Point position;
+        using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (this._eventInstanceId != eventInstanceId || this.State != ValoriaThroneEventState.CrownOnGround || this._crown is null)
+            {
+                return;
+            }
+
+            position = this._crown.OriginalDropPosition;
+        }
+
+        try
+        {
+            var crownGroundItemId = await this._mapOperations.SpawnCrownAsync(eventInstanceId, position, cancellationToken).ConfigureAwait(false);
+            using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (this._eventInstanceId != eventInstanceId || this.State != ValoriaThroneEventState.CrownOnGround || this._crown is null)
+                {
+                    await this._mapOperations.RemoveCrownAsync(eventInstanceId, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
+                this._crown.GroundItemId = crownGroundItemId;
+                await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            this._logger.LogInformation("Valoria crown {CrownGroundItemId} is available for {EventInstanceId} at {Position}.", crownGroundItemId, eventInstanceId, position);
+            await this.BroadcastAsync(announcement, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            this._logger.LogError(exception, "Could not create the Valoria crown for {EventInstanceId}.", eventInstanceId);
+            await this.StopAsync(ValoriaThroneStopReason.Failure, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask ReturnCrownAsync(Guid eventInstanceId, string announcement, CancellationToken cancellationToken)
+    {
+        Player? crownCarrier;
+        using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (this._eventInstanceId != eventInstanceId
+                || this.State is not (ValoriaThroneEventState.CrownCarried or ValoriaThroneEventState.CoronationInProgress)
+                || this._crown is null)
+            {
+                return;
+            }
+
+            this._crown.ClearHolder();
+            crownCarrier = this._crownCarrier;
+            this._crownCarrier = null;
+            this.State = ValoriaThroneEventState.CrownOnGround;
+            this._crownRespawnAt = this._timeProvider.GetUtcNow().Add(this._options.CrownRespawnDelay);
+            this._coronationCandidate = null;
+            this._coronationSenior = null;
+            await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await this.SetCrownCarrierMarkerAsync(crownCarrier, false).ConfigureAwait(false);
+        await this.BroadcastAsync($"{announcement} A Coroa retornara ao local da queda do Guardiao em {FormatDuration(this._options.CrownRespawnDelay)}.", cancellationToken).ConfigureAwait(false);
+    }
+
+    private ValueTask SetCrownCarrierMarkerAsync(Player? player, bool isActive)
+    {
+        return player is null
+            ? ValueTask.CompletedTask
+            : player.ForEachWorldObserverAsync<IWorldObjectMarkerPlugIn>(
+                view => view.SetMarkerAsync(player, this._options.CrownCarrierMarkerId, isActive),
+                true);
     }
 
     private async ValueTask TransitionAsync(Guid eventInstanceId, ValoriaThroneEventState expectedState, ValoriaThroneEventState nextState, TimeSpan duration, CancellationToken cancellationToken)
@@ -376,8 +864,9 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             ValoriaThroneEventState.Announcing => "O Trono de Valoria começará",
             ValoriaThroneEventState.Preparing => "A preparação terminará",
             ValoriaThroneEventState.RegistrationOpen => "As inscrições encerrarão",
-            ValoriaThroneEventState.InProgress => "A batalha terminará",
-            ValoriaThroneEventState.CrownAvailable => "A coroa deixará de estar disponível",
+            ValoriaThroneEventState.GuardianBattle => "A batalha terminará",
+            ValoriaThroneEventState.CrownOnGround => "A Coroa de Valoria deixará de estar disponível",
+            ValoriaThroneEventState.CrownCarried => "A fase da Coroa de Valoria terminará",
             ValoriaThroneEventState.Cooldown => "O novo evento estará disponível",
             _ => "A próxima etapa começará",
         };
@@ -406,5 +895,39 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     private ValueTask SaveSnapshotAsync(CancellationToken cancellationToken)
     {
         return this._stateStore.SaveAsync(this.GetSnapshot(), cancellationToken);
+    }
+
+    private async ValueTask PersistConfigurationAsync(CancellationToken cancellationToken)
+    {
+        var context = this._runtimeRegistry.Contexts.FirstOrDefault();
+        if (context is null)
+        {
+            return;
+        }
+
+        using var persistenceContext = context.PersistenceContextProvider.CreateNewContext();
+        var configuration = (await persistenceContext.GetAsync<GameConfiguration>(cancellationToken).ConfigureAwait(false)).FirstOrDefault();
+        var plugInConfiguration = configuration?.PlugInConfigurations.FirstOrDefault(item => item.TypeId == typeof(ValoriaThronePlugIn).GUID);
+        if (plugInConfiguration is null)
+        {
+            return;
+        }
+
+        plugInConfiguration.SetConfiguration(this._options, context.PlugInManager.CustomConfigReferenceHandler);
+        await persistenceContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask SelectDefaultEraIfDueAsync(CancellationToken cancellationToken)
+    {
+        var reign = this._activeReign;
+        if (reign is null || reign.SelectedEra != ImperialEra.None || reign.StartedAt.Add(this._options.ImperialEras.SelectionDuration) > this._timeProvider.GetUtcNow())
+        {
+            return;
+        }
+
+        reign.SelectedEra = this._options.ImperialEras.DefaultEra;
+        reign.EraSelectedAt = this._timeProvider.GetUtcNow();
+        await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        await this.BroadcastAsync($"O prazo de escolha terminou. {ImperialEraPresentation.GetName(reign.SelectedEra)} foi proclamada automaticamente. {this.GetEraDescription(reign.SelectedEra)}", cancellationToken).ConfigureAwait(false);
     }
 }

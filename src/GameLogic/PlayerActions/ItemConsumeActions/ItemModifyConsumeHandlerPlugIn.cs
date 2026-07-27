@@ -6,6 +6,7 @@
 
 namespace MUnique.OpenMU.GameLogic.PlayerActions.ItemConsumeActions;
 
+using MUnique.OpenMU.GameLogic.PlugIns;
 using MUnique.OpenMU.GameLogic.Views.Inventory;
 using MUnique.OpenMU.Persistence;
 
@@ -41,7 +42,7 @@ public abstract class ItemModifyConsumeHandlerPlugIn : BaseConsumeHandlerPlugIn
             return false;
         }
 
-        if (!this.ModifyItem(targetItem, player.PersistenceContext))
+        if (!this.ModifyItem(player, item, targetItem, player.PersistenceContext))
         {
             return false;
         }
@@ -52,11 +53,31 @@ public abstract class ItemModifyConsumeHandlerPlugIn : BaseConsumeHandlerPlugIn
         return true;
     }
 
+    /// <summary>Applies generic jewel success rate modifiers.</summary>
+    /// <param name="player">The player who applies the jewel.</param>
+    /// <param name="jewel">The jewel.</param>
+    /// <param name="targetItem">The target item.</param>
+    /// <param name="baseChance">The base chance between zero and one.</param>
+    /// <returns>The effective chance between zero and one.</returns>
+    protected static double GetEffectiveSuccessChance(Player player, Item jewel, Item targetItem, double baseChance)
+    {
+        if (baseChance is <= 0.0 or >= 1.0)
+        {
+            return Math.Clamp(baseChance, 0.0, 1.0);
+        }
+
+        var arguments = new IJewelSuccessRateModifierPlugIn.JewelSuccessRateArguments { EffectiveChance = baseChance };
+        player.GameContext.PlugInManager.GetPlugInPoint<IJewelSuccessRateModifierPlugIn>()?.ModifyJewelSuccessRate(player, jewel, targetItem, arguments);
+        return Math.Clamp(arguments.EffectiveChance, 0.0, 1.0);
+    }
+
     /// <summary>
     /// Modifies the item.
     /// </summary>
-    /// <param name="item">The item.</param>
+    /// <param name="player">The player who applies the source item.</param>
+    /// <param name="sourceItem">The consumed source item.</param>
+    /// <param name="targetItem">The item to modify.</param>
     /// <param name="persistenceContext">The persistence context.</param>
     /// <returns>Flag indicating whether the modification of the item occured.</returns>
-    protected abstract bool ModifyItem(Item item, IContext persistenceContext);
+    protected abstract bool ModifyItem(Player player, Item sourceItem, Item targetItem, IContext persistenceContext);
 }

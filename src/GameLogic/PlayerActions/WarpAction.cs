@@ -34,6 +34,16 @@ public class WarpAction
 
     private async ValueTask<string?> CheckRequirementsAsync(Player player, WarpInfo warpInfo)
     {
+        if (player.SelectedCharacter?.State >= HeroState.PlayerKiller1stStage)
+        {
+            var policyArguments = new IPlayerKillerWarpPolicyPlugIn.PlayerKillerWarpArguments();
+            player.GameContext.PlugInManager.GetPlugInPoint<IPlayerKillerWarpPolicyPlugIn>()?.EvaluatePlayerKillerWarp(player, policyArguments);
+            if (!policyArguments.Allowed)
+            {
+                return "Personagens PK não podem utilizar teleportes normais.";
+            }
+        }
+
         var requirement = player.SelectedCharacter?.GetEffectiveMoveLevelRequirement(warpInfo.LevelRequirement);
         if (requirement > player.Attributes?[Stats.Level])
         {

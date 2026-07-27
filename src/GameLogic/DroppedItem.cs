@@ -59,6 +59,21 @@ public sealed class DroppedItem : AsyncDisposable, ILocateable
     /// <param name="owners">The owners.</param>
     /// <param name="wasItemPersisted">If set to <c>true</c>, the item was persisted before and exists on the database.</param>
     public DroppedItem(Item item, Point position, GameMap map, Player? dropper, IEnumerable<object>? owners, bool wasItemPersisted = false)
+        : this(item, position, map, dropper, owners, map.ItemDropDuration, wasItemPersisted)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DroppedItem" /> class with an explicit lifetime.
+    /// </summary>
+    /// <param name="item">The item, which should be detached from any player persistence context.</param>
+    /// <param name="position">The position where the item was dropped on the map.</param>
+    /// <param name="map">The map.</param>
+    /// <param name="dropper">The dropper.</param>
+    /// <param name="owners">The owners.</param>
+    /// <param name="lifetime">The lifetime of the item on the ground. Use <see cref="Timeout.InfiniteTimeSpan"/> for an externally managed lifetime.</param>
+    /// <param name="wasItemPersisted">If set to <c>true</c>, the item was persisted before and exists on the database.</param>
+    public DroppedItem(Item item, Point position, GameMap map, Player? dropper, IEnumerable<object>? owners, TimeSpan lifetime, bool wasItemPersisted = false)
     {
         this.Item = item;
         this.Position = position;
@@ -66,7 +81,7 @@ public sealed class DroppedItem : AsyncDisposable, ILocateable
         this._dropper = dropper;
         this._owners = owners;
         this._wasItemPersisted = wasItemPersisted;
-        this._removeTimer = new Timer(this.DisposeAndDelete, null, (int)map.ItemDropDuration.TotalMilliseconds, Timeout.Infinite);
+        this._removeTimer = new Timer(this.DisposeAndDelete, null, lifetime, Timeout.InfiniteTimeSpan);
     }
 
     /// <summary>

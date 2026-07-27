@@ -85,6 +85,26 @@ public class ItemCraftAction
         return null;
     }
 
+    /// <summary>Calculates the authoritative success rate for the current crafting storage.</summary>
+    /// <param name="player">The player whose storage is evaluated.</param>
+    /// <returns>The success rate result, or <c>null</c> when no recipe matches.</returns>
+    public ChaosSuccessRateResult? CalculateSuccessRate(Player player)
+    {
+        var crafting = this.FindAppropriateCraftingByItems(player);
+        return crafting is null ? null : this.GetOrCreateCraftingHandler(crafting).CalculateSuccessRate(player);
+    }
+
+    private IItemCraftingHandler GetOrCreateCraftingHandler(ItemCrafting crafting)
+    {
+        if (!this._craftingHandlerCache.TryGetValue(crafting, out var craftingHandler))
+        {
+            craftingHandler = this.CreateCraftingHandler(crafting);
+            this._craftingHandlerCache.Add(crafting, craftingHandler);
+        }
+
+        return craftingHandler;
+    }
+
     private IItemCraftingHandler CreateCraftingHandler(ItemCrafting crafting)
     {
         if (!string.IsNullOrWhiteSpace(crafting.ItemCraftingHandlerClassName))

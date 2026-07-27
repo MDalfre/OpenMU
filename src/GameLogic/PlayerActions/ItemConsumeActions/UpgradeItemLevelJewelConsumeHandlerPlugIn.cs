@@ -44,7 +44,7 @@ public abstract class UpgradeItemLevelJewelConsumeHandlerPlugIn<TConfig>
     public abstract object CreateDefaultConfig();
 
     /// <inheritdoc/>
-    protected override bool ModifyItem(Item item, IContext persistenceContext)
+    protected override bool ModifyItem(Player player, Item sourceItem, Item item, IContext persistenceContext)
     {
         if (!item.CanLevelBeUpgraded())
         {
@@ -80,7 +80,8 @@ public abstract class UpgradeItemLevelJewelConsumeHandlerPlugIn<TConfig>
             percent += this.Configuration.SuccessRateBonusWithLuckPercentage;
         }
 
-        if (this._randomizer.NextRandomBool(percent))
+        var successChance = GetEffectiveSuccessChance(player, sourceItem, item, percent / 100.0);
+        if (this._randomizer.NextRandomBool(successChance))
         {
             item.Level += (byte)levelAmount;
             item.Durability = item.GetMaximumDurabilityOfOnePiece();

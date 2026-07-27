@@ -8,6 +8,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using MUnique.OpenMU.DataModel.Composition;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Configuration;
+using MUnique.OpenMU.PlugIns.ValoriaThrone.Domain;
 
 /// <summary>
 /// Tests for <see cref="ValoriaThroneOptions"/>.
@@ -26,5 +27,32 @@ public class ValoriaThroneOptionsTest
 
         Assert.That(property.GetCustomAttribute<MemberOfAggregateAttribute>(), Is.Not.Null);
         Assert.That(property.GetCustomAttribute<ScaffoldColumnAttribute>()?.Scaffold, Is.True);
+    }
+
+    /// <summary>
+    /// Ensures that the fallback crown representation is configured by default.
+    /// </summary>
+    [Test]
+    public void DefaultCrownRepresentationIsConfigured()
+    {
+        var options = ValoriaThroneOptions.Default;
+
+        Assert.That(options.CrownItemGroup, Is.EqualTo(14));
+        Assert.That(options.CrownItemNumber, Is.EqualTo(13));
+        Assert.That(options.CrownVisualItemLevel, Is.EqualTo(15));
+        Assert.That(options.CrownCarrierMarkerId, Is.EqualTo(1));
+        Assert.That(options.CrownDeliveryDuration, Is.GreaterThan(TimeSpan.Zero));
+        Assert.That(options.CrownRespawnDelay, Is.GreaterThanOrEqualTo(TimeSpan.Zero));
+        Assert.That(options.SeniorNpcId, Is.EqualTo(223));
+        Assert.That(options.CoronationConfirmationDuration, Is.GreaterThan(TimeSpan.Zero));
+        Assert.That(options.CoronationDuration, Is.GreaterThan(TimeSpan.Zero));
+        Assert.That(options.CoronationRadius, Is.GreaterThanOrEqualTo(0));
+        Assert.That(options.ImperialEras.DefaultEra, Is.EqualTo(ImperialEra.Ascension));
+        Assert.That(options.ImperialEras.SelectionDuration, Is.GreaterThan(TimeSpan.Zero));
+        Assert.That(options.ImperialEras.AscensionExperienceMultiplier, Is.EqualTo(1.1f));
+        Assert.That(options.ImperialEras.FortuneDropMultiplier, Is.EqualTo(1.1f));
+        Assert.That(options.ImperialEras.MaximumChaosMachineSuccessRate, Is.EqualTo(100.0));
+        Assert.That(options.ImperialEras.MaximumJewelSuccessRate, Is.EqualTo(100.0));
+        Assert.That(options.ImperialEras.AffectedJewels, Is.EquivalentTo(new[] { ValoriaJewelKind.Soul, ValoriaJewelKind.Life, ValoriaJewelKind.Harmony }));
     }
 }

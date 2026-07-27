@@ -1,0 +1,74 @@
+{
+  "Enabled": true,
+  "EventServerId": 2,
+  "EventMapId": 30,
+  "FallbackMapId": 0,
+  "FallbackPositionX": 142,
+  "FallbackPositionY": 126,
+  "AnnouncementDuration": "00:05:00",
+  "PreparationDuration": "00:01:00",
+  "RegistrationDuration": "00:05:00",
+  "BattleDuration": "00:30:00",
+  "CrownPhaseDuration": "00:02:00",
+  "CrownDeliveryDuration": "00:10:00",
+  "CrownRespawnDelay": "00:00:05",
+  "CrownItemGroup": 14,
+  "CrownItemNumber": 13,
+  "CrownVisualItemLevel": 15,
+  "CrownCarrierMarkerId": 1,
+  "SeniorNpcId": 223,
+  "CoronationConfirmationDuration": "00:00:15",
+  "CoronationDuration": "00:01:00",
+  "CoronationRadius": 4,
+  "ReignDuration": "7.00:00:00",
+  "LandsOfTrials": {
+    "Enabled": true,
+    "MapId": 31,
+    "GatekeeperNpcId": 223,
+    "AllowImperialGuild": true,
+    "AllowAlliances": true,
+    "EntryPositionX": 64,
+    "EntryPositionY": 14
+  },
+  "ImperialEras": {
+    "SelectionDuration": "00:30:00",
+    "DefaultEra": "Ascension",
+    "AscensionExperienceMultiplier": 1.1,
+    "FortuneDropMultiplier": 1.1,
+    "LuckChaosMachineMultiplier": 1.1,
+    "MaximumChaosMachineSuccessRate": 100.0,
+    "ApplyLuckToRegularCombinations": true,
+    "ApplyLuckToEventCombinations": false,
+    "ApplyLuckToCustomCombinations": false,
+    "LuckJewelMultiplier": 1.1,
+    "MaximumJewelSuccessRate": 100.0,
+    "AffectedJewels": [
+      "Soul",
+      "Life",
+      "Harmony"
+    ]
+  },
+  "CooldownDuration": "00:05:00",
+  "AllowLateEntry": false,
+  "AllowGameMasterBypass": false,
+  "GuardianMonsterId": 1,
+  "GuardianSpawnX": 93,
+  "GuardianSpawnY": 61,
+  "GuardianDirection": 2,
+  "SupportMonsters": [
+    {
+      "MonsterId": 2,
+      "SpawnX": 91,
+      "SpawnY": 61,
+      "Direction": 2
+    }
+  ],
+  "Schedule": {
+    "Enabled": true,
+    "TimeZone": "America/Sao_Paulo",
+    "DaysOfWeek": [
+      "Sunday"
+    ],
+    "StartTime": "20:00:00"
+  }
+}

@@ -9,6 +9,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.DataModel.Entities;
 using MUnique.OpenMU.GameLogic;
+using MUnique.OpenMU.GameLogic.NPC;
+using MUnique.OpenMU.GameLogic.PlayerActions;
+using MUnique.OpenMU.GameLogic.PlayerActions.Craftings;
+using MUnique.OpenMU.GameLogic.PlayerActions.Items;
 using MUnique.OpenMU.GameLogic.PlugIns;
 using MUnique.OpenMU.GameLogic.PlugIns.ChatCommands;
 using MUnique.OpenMU.PlugIns;
@@ -21,7 +25,7 @@ using MUnique.OpenMU.PlugIns.ValoriaThrone.Services;
 /// </summary>
 [PlugIn]
 [Guid("D066FCD8-6B7E-4A6E-8D77-F7BFB4096C1E")]
-public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugIn, IMapEntryValidationPlugIn, IAttackableGotKilledPlugIn, IObjectRemovedFromMapPlugIn, ISupportCustomConfiguration<ValoriaThroneOptions>, ISupportDefaultCustomConfiguration
+public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugIn, IMapEntryValidationPlugIn, IAttackableGotKilledPlugIn, IObjectRemovedFromMapPlugIn, IItemPickupPlugIn, IPlayerTalkToNpcPlugIn, IPlayerStateChangedPlugIn, IExperienceRateModifierPlugIn, ICommonDropRateModifierPlugIn, IPlayerKillerWarpPolicyPlugIn, IChaosSuccessRateModifierPlugIn, IJewelSuccessRateModifierPlugIn, ISupportCustomConfiguration<ValoriaThroneOptions>, ISupportDefaultCustomConfiguration
 {
     private const string Command = "/valoriathrone";
 
@@ -37,6 +41,7 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
     private readonly IValoriaThroneMapOperations _mapOperations;
     private readonly ValoriaThroneAdmissionPolicy _admissionPolicy;
     private readonly ValoriaThroneScheduler _scheduler;
+    private ValoriaThroneOptions _options = ValoriaThroneOptions.Default;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ValoriaThronePlugIn"/> class.
@@ -61,6 +66,9 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
         this._scheduler = scheduler;
     }
 
+    /// <summary>Gets the shared controller used by public Valoria commands.</summary>
+    internal static IValoriaThroneEventController DefaultController => SharedController;
+
     /// <summary>Gets or sets the plugin configuration.</summary>
     public ValoriaThroneOptions? Configuration
     {
@@ -81,6 +89,7 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
             this._controller.Configure(options);
             this._admissionPolicy.Configure(options);
             this._scheduler.Configure(options);
+            this._options = options;
         }
     }
 
@@ -133,6 +142,11 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
                 var snapshot = this._controller.GetSnapshot();
                 await this.SendResultAsync(player, $"Estado: {snapshot.State}; execução: {snapshot.EventInstanceId?.ToString() ?? "nenhuma"}; guardião: {snapshot.GuardianId?.ToString() ?? "nenhum"}.").ConfigureAwait(false);
                 break;
+            case "era":
+                var eraText = command.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(2).FirstOrDefault();
+                var era = Enum.TryParse<ImperialEra>(eraText, true, out var selectedEra) ? selectedEra : ImperialEra.None;
+                await this.SendResultAsync(player, await this._controller.SelectEraAsync(player, era, CancellationToken.None).ConfigureAwait(false) ? "A Era Imperial foi proclamada." : "A Era não pode ser escolhida por este personagem ou reinado.").ConfigureAwait(false);
+                break;
             case "evacuate":
                 await this._mapOperations.EvacuateAsync(CancellationToken.None).ConfigureAwait(false);
                 await this.SendResultAsync(player, "Os jogadores em Valley of Loren foram evacuados no próprio servidor.").ConfigureAwait(false);
@@ -145,7 +159,7 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
                 await this.SendResultAsync(player, "O estado do evento foi recuperado.").ConfigureAwait(false);
                 break;
             default:
-                await this.SendResultAsync(player, "Uso: /valoriathrone <start|stop|status|evacuate|spawn|reset>").ConfigureAwait(false);
+                await this.SendResultAsync(player, "Uso: /valoriathrone <start|stop|status|evacuate|spawn|reset|era Ascension|Fortune|Freedom|Luck>").ConfigureAwait(false);
                 break;
         }
     }
@@ -160,20 +174,144 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
     public async ValueTask AttackableGotKilledAsync(IAttackable killed, IAttacker? killer)
     {
         await this._controller.HandleGuardianKilledAsync(killed, killer, CancellationToken.None).ConfigureAwait(false);
+        if (killed is Player player)
+        {
+            await this._controller.HandleCrownHolderLostAsync(player, "O Portador da Coroa foi derrotado!", CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask HandleItemPickupAsync(Player player, DroppedItem droppedItem, IItemPickupPlugIn.ItemPickupArguments pickupArguments)
+    {
+        var result = await this._controller.HandleCrownPickupAsync(player, droppedItem, CancellationToken.None).ConfigureAwait(false);
+        pickupArguments.WasHandled = result != ValoriaCrownPickupResult.NotCrown;
+        pickupArguments.Success = result == ValoriaCrownPickupResult.PickedUp;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask PlayerTalksToNpcAsync(Player player, NonPlayerCharacter npc, NpcTalkEventArgs eventArgs)
+    {
+        var result = await this._controller.HandleSeniorInteractionAsync(player, npc, CancellationToken.None).ConfigureAwait(false);
+        eventArgs.HasBeenHandled = result != ValoriaSeniorInteractionResult.NotSenior;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask PlayerStateChangedAsync(Player player, State previousState, State currentState)
+    {
+        if (previousState != PlayerState.CharacterSelection || currentState != PlayerState.EnteredWorld || this._controller.ActiveReign is not { SelectedEra: not ImperialEra.None } reign)
+        {
+            return;
+        }
+
+        await player.ShowBlueMessageAsync($"O Imperador {reign.EmperorCharacterName}, da guild {reign.ImperialGuildName}, definiu a {ImperialEraPresentation.GetName(reign.SelectedEra)}: {this._controller.GetEraDescription(reign.SelectedEra)}").ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public void ModifyExperienceRate(Player player, IExperienceRateModifierPlugIn.ExperienceRateArguments arguments)
+    {
+        if (this._controller.ActiveReign?.SelectedEra == ImperialEra.Ascension)
+        {
+            arguments.Multiplier *= this._options.ImperialEras.AscensionExperienceMultiplier;
+        }
+    }
+
+    /// <inheritdoc />
+    public void ModifyCommonDropRate(Player player, MonsterDefinition monster, ICommonDropRateModifierPlugIn.CommonDropRateArguments arguments)
+    {
+        if (this._controller.ActiveReign?.SelectedEra == ImperialEra.Fortune)
+        {
+            arguments.Multiplier *= this._options.ImperialEras.FortuneDropMultiplier;
+        }
+    }
+
+    /// <inheritdoc />
+    public void EvaluatePlayerKillerWarp(Player player, IPlayerKillerWarpPolicyPlugIn.PlayerKillerWarpArguments arguments)
+    {
+        arguments.Allowed |= this._controller.ActiveReign?.SelectedEra == ImperialEra.Freedom;
+    }
+
+    /// <inheritdoc />
+    public void ModifyChaosSuccessRate(Player player, IItemCraftingHandler handler, IChaosSuccessRateModifierPlugIn.ChaosSuccessRateArguments arguments)
+    {
+        if (this._controller.ActiveReign?.SelectedEra != ImperialEra.Luck || !this.IsLuckEnabledFor(handler))
+        {
+            return;
+        }
+
+        var multiplier = this._options.ImperialEras.LuckChaosMachineMultiplier;
+        arguments.EffectiveRate = Math.Min(this._options.ImperialEras.MaximumChaosMachineSuccessRate, arguments.EffectiveRate * multiplier);
+        arguments.Modifiers.Add(new SuccessRateModifier("ImperialEra.Luck", multiplier));
+    }
+
+    /// <inheritdoc />
+    public void ModifyJewelSuccessRate(Player player, Item jewel, Item targetItem, IJewelSuccessRateModifierPlugIn.JewelSuccessRateArguments arguments)
+    {
+        if (this._controller.ActiveReign?.SelectedEra != ImperialEra.Luck || !this.IsAffectedJewel(jewel))
+        {
+            return;
+        }
+
+        var maximumChance = this._options.ImperialEras.MaximumJewelSuccessRate / 100.0;
+        arguments.EffectiveChance = Math.Min(maximumChance, arguments.EffectiveChance * this._options.ImperialEras.LuckJewelMultiplier);
     }
 
     /// <inheritdoc />
     public async ValueTask ObjectRemovedFromMapAsync(GameMap map, ILocateable removedObject)
     {
+        if (removedObject is Player player)
+        {
+            await this._controller.HandleCrownHolderLostAsync(player, "O Portador da Coroa desapareceu do campo de batalha.", CancellationToken.None).ConfigureAwait(false);
+            return;
+        }
+
+        if (removedObject is NonPlayerCharacter npc)
+        {
+            await this._controller.HandleSeniorRemovedAsync(npc, CancellationToken.None).ConfigureAwait(false);
+            return;
+        }
+
         if (removedObject is not IAttackable attackable || this._controller.GetSnapshot().EventInstanceId is not { } eventInstanceId)
         {
             return;
         }
 
-        if (this._controller.State == ValoriaThroneEventState.InProgress && this._mapOperations.IsCurrentGuardian(attackable, eventInstanceId))
+        if (this._controller.State == ValoriaThroneEventState.GuardianBattle && this._mapOperations.IsCurrentGuardian(attackable, eventInstanceId))
         {
             await this._controller.StopAsync(ValoriaThroneStopReason.Failure, CancellationToken.None).ConfigureAwait(false);
         }
+    }
+
+    private bool IsLuckEnabledFor(IItemCraftingHandler handler)
+    {
+        if (handler is BaseEventTicketCrafting)
+        {
+            return this._options.ImperialEras.ApplyLuckToEventCombinations;
+        }
+
+        if (handler is SimpleItemCraftingHandler || handler.GetType().Namespace == typeof(BaseEventTicketCrafting).Namespace)
+        {
+            return this._options.ImperialEras.ApplyLuckToRegularCombinations;
+        }
+
+        return this._options.ImperialEras.ApplyLuckToCustomCombinations;
+    }
+
+    private bool IsAffectedJewel(Item jewel)
+    {
+        if (jewel.Definition is null)
+        {
+            return false;
+        }
+
+        var identifier = new ItemIdentifier(jewel.Definition.Number, jewel.Definition.Group);
+        ValoriaJewelKind? kind = identifier == ItemConstants.JewelOfSoul
+            ? ValoriaJewelKind.Soul
+            : identifier == ItemConstants.JewelOfLife
+                ? ValoriaJewelKind.Life
+                : identifier == ItemConstants.JewelOfHarmony
+                    ? ValoriaJewelKind.Harmony
+                    : null;
+        return kind is { } affectedKind && this._options.ImperialEras.AffectedJewels.Contains(affectedKind);
     }
 
     private ValueTask SendResultAsync(Player player, string message)

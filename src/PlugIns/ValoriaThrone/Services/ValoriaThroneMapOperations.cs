@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.GameLogic;
 using MUnique.OpenMU.GameLogic.NPC;
+using MUnique.OpenMU.Pathfinding;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Configuration;
 
 /// <summary>
@@ -21,6 +22,8 @@ public sealed class ValoriaThroneMapOperations : IValoriaThroneMapOperations
     private ValoriaThroneOptions _options = ValoriaThroneOptions.Default;
     private Monster? _guardian;
     private Guid? _guardianEventInstanceId;
+    private DroppedItem? _crown;
+    private Guid? _crownEventInstanceId;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ValoriaThroneMapOperations"/> class.
@@ -53,6 +56,28 @@ public sealed class ValoriaThroneMapOperations : IValoriaThroneMapOperations
         foreach (var context in this._runtimeRegistry.Contexts)
         {
             await this.EvacuateAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask EvacuateLandsOfTrialsAsync(CancellationToken cancellationToken)
+    {
+        foreach (var context in this._runtimeRegistry.Contexts)
+        {
+            var players = (await context.GetPlayersAsync().ConfigureAwait(false))
+                .Where(player => player.CurrentMap?.Definition.Number == this._options.LandsOfTrials.MapId)
+                .ToArray();
+            var fallbackMap = context.Configuration.Maps.FirstOrDefault(map => map.Number == this._options.FallbackMapId);
+            if (fallbackMap is null)
+            {
+                continue;
+            }
+
+            var fallbackGate = new ExitGate { Map = fallbackMap, X1 = this._options.FallbackPositionX, X2 = this._options.FallbackPositionX, Y1 = this._options.FallbackPositionY, Y2 = this._options.FallbackPositionY };
+            foreach (var player in players)
+            {
+                await player.WarpToAsync(fallbackGate).ConfigureAwait(false);
+            }
         }
     }
 
@@ -119,6 +144,11 @@ public sealed class ValoriaThroneMapOperations : IValoriaThroneMapOperations
     /// <inheritdoc />
     public async ValueTask CleanupAsync(Guid? eventInstanceId, CancellationToken cancellationToken)
     {
+        if (eventInstanceId is { } currentEventInstanceId)
+        {
+            await this.RemoveCrownAsync(currentEventInstanceId, cancellationToken).ConfigureAwait(false);
+        }
+
         await this.CleanupEventMonstersAsync(cancellationToken).ConfigureAwait(false);
         foreach (var context in this._runtimeRegistry.Contexts)
         {
@@ -130,6 +160,59 @@ public sealed class ValoriaThroneMapOperations : IValoriaThroneMapOperations
     public bool IsCurrentGuardian(IAttackable attackable, Guid eventInstanceId)
     {
         return ReferenceEquals(this._guardian, attackable) && this._guardianEventInstanceId == eventInstanceId;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<ushort?> SpawnCrownAsync(Guid eventInstanceId, Point position, CancellationToken cancellationToken)
+    {
+        if (this._options.EventServerId is not { } eventServerId)
+        {
+            return null;
+        }
+
+        var context = this._runtimeRegistry.Contexts.FirstOrDefault(candidate => candidate.Id == eventServerId);
+        if (context is null)
+        {
+            throw new InvalidOperationException($"The configured event server {eventServerId} is not hosted by this process.");
+        }
+
+        var map = await context.GetMapAsync(this._options.EventMapId).ConfigureAwait(false)
+                  ?? throw new InvalidOperationException($"Event map {this._options.EventMapId} was not found.");
+        if (!map.Terrain.WalkMap[position.X, position.Y])
+        {
+            throw new InvalidOperationException("The original crown position is not walkable.");
+        }
+
+        var itemDefinition = context.Configuration.Items.FirstOrDefault(item => item.Group == this._options.CrownItemGroup && item.Number == this._options.CrownItemNumber)
+                             ?? throw new InvalidOperationException($"The configured crown item {this._options.CrownItemGroup}:{this._options.CrownItemNumber} was not found.");
+        await this.RemoveCrownAsync(eventInstanceId, cancellationToken).ConfigureAwait(false);
+
+        var crown = new DroppedItem(new TemporaryItem { Definition = itemDefinition, Level = this._options.CrownVisualItemLevel }, position, map, null, null, Timeout.InfiniteTimeSpan);
+        await map.AddAsync(crown).ConfigureAwait(false);
+        this._crown = crown;
+        this._crownEventInstanceId = eventInstanceId;
+        this._logger.LogInformation("Spawned Valoria crown {CrownGroundItemId} for {EventInstanceId} at {Position} on server {ServerId}.", crown.Id, eventInstanceId, position, context.Id);
+        return crown.Id;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask RemoveCrownAsync(Guid eventInstanceId, CancellationToken cancellationToken)
+    {
+        if (this._crown is not { } crown || this._crownEventInstanceId != eventInstanceId)
+        {
+            return;
+        }
+
+        this._crown = null;
+        this._crownEventInstanceId = null;
+        cancellationToken.ThrowIfCancellationRequested();
+        await crown.DisposeAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public bool IsCurrentCrown(DroppedItem droppedItem, Guid eventInstanceId)
+    {
+        return ReferenceEquals(this._crown, droppedItem) && this._crownEventInstanceId == eventInstanceId;
     }
 
     private async ValueTask EvacuateAsync(IGameServerContext context, CancellationToken cancellationToken)

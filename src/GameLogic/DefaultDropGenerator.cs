@@ -6,6 +6,7 @@ namespace MUnique.OpenMU.GameLogic;
 
 using MUnique.OpenMU.DataModel.Configuration.Items;
 using MUnique.OpenMU.GameLogic.Attributes;
+using MUnique.OpenMU.GameLogic.PlugIns;
 using Nito.AsyncEx;
 
 /// <summary>
@@ -87,7 +88,7 @@ public class DefaultDropGenerator : IDropGenerator
         }
 
         uint money = 0;
-        var (droppedItems, moneyResult) = this.GenerateDrops(monster, gainedExperience);
+        var (droppedItems, moneyResult) = this.GenerateDrops(monster, gainedExperience, player);
         if (moneyResult > 0)
         {
             money = moneyResult;
@@ -270,7 +271,7 @@ public class DefaultDropGenerator : IDropGenerator
         return itemDefinition.MaximumDropLevel is not { } maxDropLevel || monsterLevel <= maxDropLevel;
     }
 
-    private (IList<Item>? Items, uint Money) GenerateDrops(MonsterDefinition monster, int gainedExperience)
+    private (IList<Item>? Items, uint Money) GenerateDrops(MonsterDefinition monster, int gainedExperience, Player player)
     {
         uint money = 0;
         List<Item>? droppedItems = null;
@@ -308,9 +309,12 @@ public class DefaultDropGenerator : IDropGenerator
                 totalChance += group.Chance;
             }
 
+            var rateArguments = new ICommonDropRateModifierPlugIn.CommonDropRateArguments();
+            player.GameContext.PlugInManager.GetPlugInPoint<ICommonDropRateModifierPlugIn>()?.ModifyCommonDropRate(player, monster, rateArguments);
+            var effectiveTotalChance = Math.Min(1.0, totalChance * Math.Max(0.0, rateArguments.Multiplier));
             for (int i = 0; i < remainingDrops; i++)
             {
-                var group = this.SelectRandomGroup(this._chanceDropGroups, totalChance);
+                var group = this.SelectRandomGroup(this._chanceDropGroups, totalChance, effectiveTotalChance);
                 if (group is null)
                 {
                     continue;
@@ -553,13 +557,17 @@ public class DefaultDropGenerator : IDropGenerator
     }
 
     private DropItemGroup? SelectRandomGroup(IEnumerable<DropItemGroup> groups, double totalChance)
+        => this.SelectRandomGroup(groups, totalChance, Math.Min(1.0, totalChance));
+
+    private DropItemGroup? SelectRandomGroup(IEnumerable<DropItemGroup> groups, double totalChance, double effectiveTotalChance)
     {
         var remainingThreshold = this._randomizer.NextDouble();
-        if (totalChance > 1.0)
+        if (remainingThreshold > effectiveTotalChance)
         {
-            remainingThreshold *= totalChance;
+            return null;
         }
 
+        remainingThreshold = effectiveTotalChance == 0 ? 0 : remainingThreshold * totalChance / effectiveTotalChance;
         foreach (var group in groups)
         {
             if (remainingThreshold > group.Chance)

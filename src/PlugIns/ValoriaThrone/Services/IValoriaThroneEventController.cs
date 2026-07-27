@@ -5,6 +5,7 @@
 namespace MUnique.OpenMU.PlugIns.ValoriaThrone.Services;
 
 using MUnique.OpenMU.GameLogic;
+using MUnique.OpenMU.GameLogic.NPC;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Configuration;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Domain;
 
@@ -15,6 +16,9 @@ public interface IValoriaThroneEventController
 {
     /// <summary>Gets the current event state.</summary>
     ValoriaThroneEventState State { get; }
+
+    /// <summary>Gets the active imperial reign, if one exists.</summary>
+    ImperialReign? ActiveReign { get; }
 
     /// <summary>Configures the controller.</summary>
     void Configure(ValoriaThroneOptions options);
@@ -36,6 +40,30 @@ public interface IValoriaThroneEventController
 
     /// <summary>Handles a possible guardian death.</summary>
     ValueTask<bool> HandleGuardianKilledAsync(IAttackable killed, IAttacker? killer, CancellationToken cancellationToken);
+
+    /// <summary>Handles a possible pickup request for the current crown.</summary>
+    ValueTask<ValoriaCrownPickupResult> HandleCrownPickupAsync(Player player, DroppedItem droppedItem, CancellationToken cancellationToken);
+
+    /// <summary>Handles an unexpected loss of the crown holder.</summary>
+    ValueTask<bool> HandleCrownHolderLostAsync(Player player, string reason, CancellationToken cancellationToken);
+
+    /// <summary>Determines whether the player currently carries the crown.</summary>
+    bool IsCrownHolder(Player player);
+
+    /// <summary>Determines whether the player may enter Lands of Trials.</summary>
+    ValueTask<bool> CanEnterLandsOfTrialsAsync(Player player, CancellationToken cancellationToken);
+
+    /// <summary>Selects the era for the active reign when requested by its emperor.</summary>
+    ValueTask<bool> SelectEraAsync(Player player, ImperialEra era, CancellationToken cancellationToken);
+
+    /// <summary>Gets the configured description of an era.</summary>
+    string GetEraDescription(ImperialEra era);
+
+    /// <summary>Handles a player interaction with a possible event Senior.</summary>
+    ValueTask<ValoriaSeniorInteractionResult> HandleSeniorInteractionAsync(Player player, NonPlayerCharacter npc, CancellationToken cancellationToken);
+
+    /// <summary>Handles the removal of a possible event Senior.</summary>
+    ValueTask<bool> HandleSeniorRemovedAsync(NonPlayerCharacter npc, CancellationToken cancellationToken);
 
     /// <summary>Spawns the guardian while registration is open.</summary>
     ValueTask<bool> SpawnGuardianAsync(CancellationToken cancellationToken);

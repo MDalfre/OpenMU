@@ -20,6 +20,11 @@ public interface IItemCraftingHandler
     /// <returns>The crafting result and the resulting item; if there are multiple, only the last one is returned.</returns>
     ValueTask<(CraftingResult Result, Item? Item)> DoMixAsync(Player player, byte socketSlot);
 
+    /// <summary>Calculates the current authoritative success rate without executing the mix.</summary>
+    /// <param name="player">The player whose crafting storage is evaluated.</param>
+    /// <returns>The calculation result, or <c>null</c> if the stored items do not form this recipe.</returns>
+    ChaosSuccessRateResult? CalculateSuccessRate(Player player);
+
     /// <summary>
     /// Tries to get the required items for this crafting.
     /// If they can't be get or something is wrong, a <see cref="CraftingResult"/> with the

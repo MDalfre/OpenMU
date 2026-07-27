@@ -1287,6 +1287,9 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
         experience *= gameRate;
         experience *= attributes[expRateAttribute] + attributes[Stats.BonusExperienceRate];
         experience *= this.CurrentMap?.Definition.ExpMultiplier ?? 1;
+        var experienceRateArguments = new IExperienceRateModifierPlugIn.ExperienceRateArguments();
+        this.GameContext.PlugInManager.GetPlugInPoint<IExperienceRateModifierPlugIn>()?.ModifyExperienceRate(this, experienceRateArguments);
+        experience *= experienceRateArguments.Multiplier;
 
         var minMultiplier = attributes[Stats.RandomExperienceMinMultiplier];
         var maxMultiplier = attributes[Stats.RandomExperienceMaxMultiplier];

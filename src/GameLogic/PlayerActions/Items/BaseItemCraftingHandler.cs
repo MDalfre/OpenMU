@@ -24,14 +24,17 @@ public abstract class BaseItemCraftingHandler : IItemCraftingHandler
             return (CraftingResult.Failed, null);
         }
 
-        if (this.TryGetRequiredItems(player, out var items, out var successRate) is { } error)
+        if (this.TryGetRequiredItems(player, out var items, out var baseSuccessRate) is { } error)
         {
             return (error, null);
         }
 
+        var rateResult = this.ApplySuccessRateModifiers(player, baseSuccessRate);
+        var successRate = rateResult.EffectiveRate;
+
         player.Logger.LogInformation("Crafting success chance: {successRate} %", successRate);
 
-        var price = this.GetPrice(successRate, items);
+        var price = this.GetPrice(baseSuccessRate, items);
         if (!player.TryRemoveMoney(price))
         {
             return (CraftingResult.NotEnoughMoney, null);
@@ -39,11 +42,11 @@ public abstract class BaseItemCraftingHandler : IItemCraftingHandler
 
         await player.InvokeViewPlugInAsync<IUpdateMoneyPlugIn>(p => p.UpdateMoneyAsync()).ConfigureAwait(false);
 
-        var success = Rand.NextRandomBool(successRate);
+        var success = Rand.NextRandomBool((int)Math.Round(successRate * 100), 10000);
         if (success)
         {
             player.Logger.LogInformation("Crafting succeeded with success chance: {successRate} %", successRate);
-            if (await this.DoTheMixAsync(items, player, socketSlot, successRate).ConfigureAwait(false) is { } item)
+            if (await this.DoTheMixAsync(items, player, socketSlot, (byte)Math.Round(successRate)).ConfigureAwait(false) is { } item)
             {
                 player.Logger.LogInformation("Crafted item: {item}", item);
 
@@ -74,6 +77,14 @@ public abstract class BaseItemCraftingHandler : IItemCraftingHandler
     /// <inheritdoc/>
     public abstract CraftingResult? TryGetRequiredItems(Player player, out IList<CraftingRequiredItemLink> items, out byte successRateByItems);
 
+    /// <inheritdoc />
+    public ChaosSuccessRateResult? CalculateSuccessRate(Player player)
+    {
+        return this.TryGetRequiredItems(player, out _, out var baseSuccessRate) is null
+            ? this.ApplySuccessRateModifiers(player, baseSuccessRate)
+            : null;
+    }
+
     /// <summary>
     /// Gets the price based on the success rate and the required items.
     /// </summary>
@@ -91,6 +102,14 @@ public abstract class BaseItemCraftingHandler : IItemCraftingHandler
     /// <param name="successRate">The success rate of the combination.</param>
     /// <returns>The created or modified items.</returns>
     protected abstract ValueTask<List<Item>> CreateOrModifyResultItemsAsync(IList<CraftingRequiredItemLink> requiredItems, Player player, byte socketSlot, byte successRate);
+
+    private ChaosSuccessRateResult ApplySuccessRateModifiers(Player player, byte baseSuccessRate)
+    {
+        var arguments = new IChaosSuccessRateModifierPlugIn.ChaosSuccessRateArguments { EffectiveRate = baseSuccessRate };
+        player.GameContext.PlugInManager.GetPlugInPoint<IChaosSuccessRateModifierPlugIn>()?.ModifyChaosSuccessRate(player, this, arguments);
+        var effectiveRate = baseSuccessRate is 0 or 100 ? baseSuccessRate : Math.Clamp(arguments.EffectiveRate, 0.0, 100.0);
+        return new ChaosSuccessRateResult(baseSuccessRate, effectiveRate, arguments.Modifiers.ToList());
+    }
 
     /// <summary>
     /// Performs the crafting with the specified items.

@@ -32,31 +32,59 @@ public sealed class ValoriaThroneAdmissionPolicy
     public void Configure(ValoriaThroneOptions options) => this._options = options;
 
     /// <summary>Validates a map entry attempt.</summary>
-    public ValueTask ValidateAsync(Player player, GameMapDefinition targetMap, MapEntrySource source, MapEntryValidationEventArgs eventArgs)
+    public async ValueTask ValidateAsync(Player player, GameMapDefinition targetMap, MapEntrySource source, MapEntryValidationEventArgs eventArgs)
     {
+        if (this._controller.IsCrownHolder(player) && targetMap.Number != this._options.EventMapId)
+        {
+            eventArgs.Denied = true;
+            eventArgs.Message = "O Portador da Coroa nÃ£o pode deixar Valley of Loren.";
+            return;
+        }
+
+        if (this._options.LandsOfTrials.Enabled && targetMap.Number == this._options.LandsOfTrials.MapId)
+        {
+            if (await this._controller.CanEnterLandsOfTrialsAsync(player, CancellationToken.None).ConfigureAwait(false))
+            {
+                return;
+            }
+
+            eventArgs.Denied = true;
+            eventArgs.Message = "Somente a Guild Imperial e suas alianças podem entrar em Lands of Trials.";
+            if (source == MapEntrySource.CharacterSelection)
+            {
+                var fallbackMap = player.GameContext.Configuration.Maps.FirstOrDefault(map => map.Number == this._options.FallbackMapId);
+                if (fallbackMap is not null)
+                {
+                    eventArgs.RedirectGate = new ExitGate { Map = fallbackMap, X1 = this._options.FallbackPositionX, X2 = this._options.FallbackPositionX, Y1 = this._options.FallbackPositionY, Y2 = this._options.FallbackPositionY };
+                }
+            }
+
+            return;
+        }
+
         if (!this._options.Enabled || targetMap.Number != this._options.EventMapId)
         {
-            return ValueTask.CompletedTask;
+            return;
         }
 
         var state = this._controller.State;
         if (state is ValoriaThroneEventState.Idle or ValoriaThroneEventState.Cooldown)
         {
-            return ValueTask.CompletedTask;
+            return;
         }
 
         if (this._options.AllowGameMasterBypass && player.SelectedCharacter?.CharacterStatus >= CharacterStatus.GameMaster)
         {
-            return ValueTask.CompletedTask;
+            return;
         }
 
         var eventServerId = this._options.EventServerId;
         var isAuthorizedServer = player.GameContext is IGameServerContext context && context.Id == eventServerId;
         var allowed = state == ValoriaThroneEventState.RegistrationOpen && isAuthorizedServer
-                      || state == ValoriaThroneEventState.InProgress && isAuthorizedServer && this._options.AllowLateEntry;
+                      || state == ValoriaThroneEventState.GuardianBattle && isAuthorizedServer && this._options.AllowLateEntry;
         if (allowed)
         {
-            return ValueTask.CompletedTask;
+            return;
         }
 
         eventArgs.Denied = true;
@@ -84,6 +112,6 @@ public sealed class ValoriaThroneAdmissionPolicy
             }
         }
 
-        return ValueTask.CompletedTask;
+        return;
     }
 }

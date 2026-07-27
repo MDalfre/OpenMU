@@ -6,6 +6,7 @@ namespace MUnique.OpenMU.GameLogic.PlayerActions.Items;
 
 using MUnique.OpenMU.DataModel.Configuration.Items;
 using MUnique.OpenMU.DataModel.Configuration.Quests;
+using MUnique.OpenMU.GameLogic.PlugIns;
 using MUnique.OpenMU.GameLogic.Views;
 using MUnique.OpenMU.GameLogic.Views.Inventory;
 using MUnique.OpenMU.Interfaces;
@@ -35,7 +36,12 @@ public class PickupItemAction
                 break;
             case DroppedItem droppedItem:
                 {
-                    var (success, stackTarget) = await TryPickupItemAsync(player, droppedItem).ConfigureAwait(false);
+                    var (success, stackTarget, wasHandled) = await TryPickupItemAsync(player, droppedItem).ConfigureAwait(false);
+                    if (wasHandled)
+                    {
+                        break;
+                    }
+
                     if (success)
                     {
                         if (stackTarget != null)
@@ -114,11 +120,21 @@ public class PickupItemAction
             .Any(r => r.Item == item.Definition && (r.DropItemGroup?.ItemLevel is null || r.DropItemGroup.ItemLevel == item.Level));
     }
 
-    private static async ValueTask<(bool Success, Item? StackTarget)> TryPickupItemAsync(Player player, DroppedItem droppedItem)
+    private static async ValueTask<(bool Success, Item? StackTarget, bool WasHandled)> TryPickupItemAsync(Player player, DroppedItem droppedItem)
     {
         if (!CanPickup(player, droppedItem))
         {
-            return (false, null);
+            return (false, null, false);
+        }
+
+        if (player.GameContext.PlugInManager.GetPlugInPoint<IItemPickupPlugIn>() is { } plugInPoint)
+        {
+            var pickupArguments = new IItemPickupPlugIn.ItemPickupArguments();
+            await plugInPoint.HandleItemPickupAsync(player, droppedItem, pickupArguments).ConfigureAwait(false);
+            if (pickupArguments.WasHandled)
+            {
+                return (pickupArguments.Success, null, true);
+            }
         }
 
         if (IsLimitReached(player, droppedItem.Item.Definition))
@@ -132,30 +148,33 @@ public class PickupItemAction
             }
 
             await player.ShowLocalizedBlueMessageAsync(nameof(PlayerMessage.PickupLimitReached), itemName).ConfigureAwait(false);
-            return (false, null);
+            return (false, null, false);
         }
 
         var slot = player.Inventory?.CheckInvSpace(droppedItem.Item);
         if (slot < InventoryConstants.EquippableSlotsCount)
         {
-            return (false, null);
+            return (false, null, false);
         }
 
         if (droppedItem.Item.Definition?.IsQuestItem == true
             && !PlayerHasActiveQuestForItem(player, droppedItem.Item))
         {
-            return await RejectAsync(player, nameof(PlayerMessage.ItemDoesNotBelongToYou)).ConfigureAwait(false);
+            var rejectionResult = await RejectAsync(player, nameof(PlayerMessage.ItemDoesNotBelongToYou)).ConfigureAwait(false);
+            return (rejectionResult.Success, rejectionResult.StackTarget, false);
         }
 
         if (droppedItem.Item.Definition?.IsBoundToCharacter == true
             && !droppedItem.IsPlayerAnOwner(player))
         {
-            return await RejectAsync(player, nameof(PlayerMessage.ItemDoesNotBelongToYou)).ConfigureAwait(false);
+            var rejectionResult = await RejectAsync(player, nameof(PlayerMessage.ItemDoesNotBelongToYou)).ConfigureAwait(false);
+            return (rejectionResult.Success, rejectionResult.StackTarget, false);
         }
 
         if (!droppedItem.IsPlayerAnOwner(player) && droppedItem.IsOwnerPickupPriorityActive)
         {
-            return await RejectAsync(player, nameof(PlayerMessage.ItemDoesNotBelongToYou)).ConfigureAwait(false);
+            var rejectionResult = await RejectAsync(player, nameof(PlayerMessage.ItemDoesNotBelongToYou)).ConfigureAwait(false);
+            return (rejectionResult.Success, rejectionResult.StackTarget, false);
         }
 
         var result = await droppedItem.TryPickUpByAsync(player).ConfigureAwait(false);
@@ -164,7 +183,7 @@ public class PickupItemAction
             await player.OnPickedUpItemAsync(droppedItem).ConfigureAwait(false);
         }
 
-        return result;
+        return (result.Success, result.StackTarget, false);
     }
 
     private static async ValueTask<bool> TryPickupMoneyAsync(Player player, DroppedMoney droppedMoney)

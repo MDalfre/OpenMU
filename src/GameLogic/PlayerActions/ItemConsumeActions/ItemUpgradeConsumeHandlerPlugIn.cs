@@ -51,7 +51,7 @@ public abstract class ItemUpgradeConsumeHandlerPlugIn : ItemModifyConsumeHandler
     internal ItemUpgradeConfiguration Configuration { get; }
 
     /// <inheritdoc/>
-    protected override bool ModifyItem(Item item, IContext persistenceContext)
+    protected override bool ModifyItem(Player player, Item sourceItem, Item item, IContext persistenceContext)
     {
         if (!this.ItemCanHaveOption(item))
         {
@@ -60,10 +60,10 @@ public abstract class ItemUpgradeConsumeHandlerPlugIn : ItemModifyConsumeHandler
 
         if (this.ItemHasOptionAlready(item))
         {
-            return this.TryUpgradeItemOption(item);
+            return this.TryUpgradeItemOption(player, sourceItem, item);
         }
 
-        return this.TryAddItemOption(item, persistenceContext);
+        return this.TryAddItemOption(player, sourceItem, item, persistenceContext);
     }
 
     /// <summary>
@@ -79,9 +79,11 @@ public abstract class ItemUpgradeConsumeHandlerPlugIn : ItemModifyConsumeHandler
     /// <summary>
     /// Tries to upgrade the item option.
     /// </summary>
+    /// <param name="player">The player who applies the source item.</param>
+    /// <param name="sourceItem">The source item.</param>
     /// <param name="item">The item to upgrade.</param>
     /// <returns>Flag indicating whether the item option was upgraded.</returns>
-    protected virtual bool TryUpgradeItemOption(Item item)
+    protected virtual bool TryUpgradeItemOption(Player player, Item sourceItem, Item item)
     {
         if (!this.Configuration.IncreasesOption)
         {
@@ -96,7 +98,8 @@ public abstract class ItemUpgradeConsumeHandlerPlugIn : ItemModifyConsumeHandler
             return false;
         }
 
-        if (Rand.NextRandomBool(this.Configuration.SuccessChance))
+        var successChance = GetEffectiveSuccessChance(player, sourceItem, item, this.Configuration.SuccessChance);
+        if (Rand.NextRandomBool(successChance))
         {
             itemOption.Level++;
         }
@@ -124,14 +127,15 @@ public abstract class ItemUpgradeConsumeHandlerPlugIn : ItemModifyConsumeHandler
         }
     }
 
-    private bool TryAddItemOption(Item item, IContext persistenceContext)
+    private bool TryAddItemOption(Player player, Item sourceItem, Item item, IContext persistenceContext)
     {
         if (!this.Configuration.AddsOption || item.Definition is null)
         {
             return false;
         }
 
-        if (Rand.NextRandomBool(this.Configuration.SuccessChance))
+        var successChance = GetEffectiveSuccessChance(player, sourceItem, item, this.Configuration.SuccessChance);
+        if (Rand.NextRandomBool(successChance))
         {
             var possibleOptions = item.Definition.PossibleItemOptions.
                 SelectMany(o => o.PossibleOptions).

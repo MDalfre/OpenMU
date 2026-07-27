@@ -103,4 +103,100 @@ public class ValoriaThroneOptionsValidatorTest
 
         Assert.DoesNotThrow(() => ValoriaThroneOptionsValidator.Validate(options));
     }
+
+    /// <summary>
+    /// Tests that an enabled event requires a positive crown delivery duration.
+    /// </summary>
+    [Test]
+    public void ValidateEnabledConfigurationWithInvalidCrownDeliveryDurationThrows()
+    {
+        var options = new ValoriaThroneOptions
+        {
+            Enabled = true,
+            EventServerId = 1,
+            GuardianMonsterId = 1,
+            CrownDeliveryDuration = TimeSpan.Zero,
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ValoriaThroneOptionsValidator.Validate(options));
+    }
+
+    /// <summary>
+    /// Tests that an enabled event requires a senior NPC definition.
+    /// </summary>
+    [Test]
+    public void ValidateEnabledConfigurationWithoutSeniorNpcThrows()
+    {
+        var options = new ValoriaThroneOptions
+        {
+            Enabled = true,
+            EventServerId = 1,
+            GuardianMonsterId = 1,
+            SeniorNpcId = 0,
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ValoriaThroneOptionsValidator.Validate(options));
+    }
+
+    /// <summary>
+    /// Tests that an enabled event requires a positive coronation duration.
+    /// </summary>
+    [Test]
+    public void ValidateEnabledConfigurationWithInvalidCoronationDurationThrows()
+    {
+        var options = new ValoriaThroneOptions
+        {
+            Enabled = true,
+            EventServerId = 1,
+            GuardianMonsterId = 1,
+            CoronationDuration = TimeSpan.Zero,
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ValoriaThroneOptionsValidator.Validate(options));
+    }
+
+    /// <summary>Tests that an enabled event requires a valid era selection duration.</summary>
+    [Test]
+    public void ValidateEnabledConfigurationWithInvalidEraSelectionDurationThrows()
+    {
+        var options = new ValoriaThroneOptions
+        {
+            Enabled = true,
+            EventServerId = 1,
+            GuardianMonsterId = 1,
+            ImperialEras = new ValoriaImperialEraOptions { SelectionDuration = TimeSpan.Zero },
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ValoriaThroneOptionsValidator.Validate(options));
+    }
+
+    /// <summary>Tests that the crown visual marker uses a valid item level.</summary>
+    [Test]
+    public void ValidateEnabledConfigurationWithInvalidCrownVisualLevelThrows()
+    {
+        var options = new ValoriaThroneOptions
+        {
+            Enabled = true,
+            EventServerId = 1,
+            GuardianMonsterId = 1,
+            CrownVisualItemLevel = 16,
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ValoriaThroneOptionsValidator.Validate(options));
+    }
+
+    /// <summary>Tests that Chaos Machine and jewel caps cannot exceed one hundred percent.</summary>
+    [Test]
+    public void ValidateEnabledConfigurationWithInvalidSuccessRateCapThrows()
+    {
+        var options = new ValoriaThroneOptions
+        {
+            Enabled = true,
+            EventServerId = 1,
+            GuardianMonsterId = 1,
+            ImperialEras = new ValoriaImperialEraOptions { MaximumJewelSuccessRate = 101.0 },
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ValoriaThroneOptionsValidator.Validate(options));
+    }
 }
