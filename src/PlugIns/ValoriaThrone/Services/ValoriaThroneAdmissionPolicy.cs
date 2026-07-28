@@ -96,13 +96,14 @@ public sealed class ValoriaThroneAdmissionPolicy
         var isEventMap = targetMap.Number == this._options.EventMapId;
         var canEnterOnRegistration = state == ValoriaThroneEventState.RegistrationOpen;
         var canEnterLate = state == ValoriaThroneEventState.GuardianBattle && this._options.AllowLateEntry;
-        var allowed = isEventMap && isAuthorizedServer && (canEnterOnRegistration || canEnterLate);
+        var canReenterViaGate = source == MapEntrySource.CharacterSelection && isEventMap && isAuthorizedServer;
+        var allowed = isEventMap && isAuthorizedServer && (canEnterOnRegistration || canEnterLate || canReenterViaGate);
 
         var serverId = player.GameContext is IGameServerContext ctx ? ctx.Id : (byte?)null;
         this._logger.LogInformation(
             "ValoriaThroneAdmission | Player: {PlayerName} | TargetMap: {TargetMapNumber} | EventMapId: {EventMapId} | IsEventMap: {IsEventMap} | " +
             "ServerIdPlayer: {ServerIdPlayer} | EventServerId: {EventServerId} | IsAuthorizedServer: {IsAuthorizedServer} | " +
-            "State: {State} | CanEnterOnRegistration: {CanEnterOnRegistration} | AllowLateEntry: {AllowLateEntry} | CanEnterLate: {CanEnterLate} | " +
+            "State: {State} | CanEnterOnRegistration: {CanEnterOnRegistration} | AllowLateEntry: {AllowLateEntry} | CanEnterLate: {CanEnterLate} | CanReenterViaGate: {CanReenterViaGate} | " +
             "Allowed: {Allowed} | Source: {Source}",
             player.SelectedCharacter?.Name ?? "?",
             targetMap.Number,
@@ -115,6 +116,7 @@ public sealed class ValoriaThroneAdmissionPolicy
             canEnterOnRegistration,
             this._options.AllowLateEntry,
             canEnterLate,
+            canReenterViaGate,
             allowed,
             source);
 
@@ -145,6 +147,19 @@ public sealed class ValoriaThroneAdmissionPolicy
                     Y1 = this._options.FallbackPositionY,
                     Y2 = this._options.FallbackPositionY,
                 };
+                this._logger.LogInformation(
+                    "ValoriaThroneAdmission REDIRECT | Player: {PlayerName} | FallbackMapId: {FallbackMapId} | Position: ({X}, {Y})",
+                    player.SelectedCharacter?.Name ?? "?",
+                    this._options.FallbackMapId,
+                    this._options.FallbackPositionX,
+                    this._options.FallbackPositionY);
+            }
+            else
+            {
+                this._logger.LogWarning(
+                    "ValoriaThroneAdmission REDIRECT FAILED | Player: {PlayerName} | FallbackMapId: {FallbackMapId} not found in Configuration.Maps",
+                    player.SelectedCharacter?.Name ?? "?",
+                    this._options.FallbackMapId);
             }
         }
 
