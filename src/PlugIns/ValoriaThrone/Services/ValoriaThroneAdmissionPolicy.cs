@@ -97,6 +97,27 @@ public sealed class ValoriaThroneAdmissionPolicy
         var canEnterOnRegistration = state == ValoriaThroneEventState.RegistrationOpen;
         var canEnterLate = state == ValoriaThroneEventState.GuardianBattle && this._options.AllowLateEntry;
         var allowed = isEventMap && isAuthorizedServer && (canEnterOnRegistration || canEnterLate);
+
+        var serverId = player.GameContext is IGameServerContext ctx ? ctx.Id : (byte?)null;
+        this._logger.LogInformation(
+            "ValoriaThroneAdmission | Player: {PlayerName} | TargetMap: {TargetMapNumber} | EventMapId: {EventMapId} | IsEventMap: {IsEventMap} | " +
+            "ServerIdPlayer: {ServerIdPlayer} | EventServerId: {EventServerId} | IsAuthorizedServer: {IsAuthorizedServer} | " +
+            "State: {State} | CanEnterOnRegistration: {CanEnterOnRegistration} | AllowLateEntry: {AllowLateEntry} | CanEnterLate: {CanEnterLate} | " +
+            "Allowed: {Allowed} | Source: {Source}",
+            player.SelectedCharacter?.Name ?? "?",
+            targetMap.Number,
+            this._options.EventMapId,
+            isEventMap,
+            serverId,
+            eventServerId,
+            isAuthorizedServer,
+            state,
+            canEnterOnRegistration,
+            this._options.AllowLateEntry,
+            canEnterLate,
+            allowed,
+            source);
+
         if (allowed)
         {
             return;
