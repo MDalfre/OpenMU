@@ -82,7 +82,7 @@ public class ValoriaThroneSuccessRateModifierTest
         var plugIn = new ValoriaThronePlugIn(
             controller,
             mapOperations,
-            new ValoriaThroneAdmissionPolicy(controller),
+            new ValoriaThroneAdmissionPolicy(controller, NullLogger<ValoriaThroneAdmissionPolicy>.Instance),
             new ValoriaThroneScheduler(TimeProvider.System));
         plugIn.Configuration = new ValoriaThroneOptions
         {
