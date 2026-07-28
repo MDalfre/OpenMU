@@ -4,6 +4,7 @@
 
 namespace MUnique.OpenMU.PlugIns.ValoriaThrone.Services;
 
+using Microsoft.Extensions.Logging;
 using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.DataModel.Entities;
 using MUnique.OpenMU.GameLogic;
@@ -18,14 +19,16 @@ using MUnique.OpenMU.PlugIns.ValoriaThrone.Domain;
 public sealed class ValoriaThroneAdmissionPolicy
 {
     private readonly IValoriaThroneEventController _controller;
+    private readonly ILogger<ValoriaThroneAdmissionPolicy> _logger;
     private ValoriaThroneOptions _options = ValoriaThroneOptions.Default;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ValoriaThroneAdmissionPolicy"/> class.
     /// </summary>
-    public ValoriaThroneAdmissionPolicy(IValoriaThroneEventController controller)
+    public ValoriaThroneAdmissionPolicy(IValoriaThroneEventController controller, ILogger<ValoriaThroneAdmissionPolicy> logger)
     {
         this._controller = controller;
+        this._logger = logger;
     }
 
     /// <summary>Configures the policy.</summary>
@@ -43,6 +46,7 @@ public sealed class ValoriaThroneAdmissionPolicy
         {
             if (targetMap.Number != this._options.EventMapId)
             {
+                 this._logger.LogInformation("Warp targetMap number: {TargetMapNumber}, EventMapId: {EventMapId}", targetMap.Number, this._options.EventMapId);
                 eventArgs.Denied = true;
                 eventArgs.Message = "O Portador da Coroa nÃ£o pode deixar Valley of Loren.";
                 return;

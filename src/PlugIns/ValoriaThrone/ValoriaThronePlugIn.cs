@@ -34,7 +34,7 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
     private static readonly IValoriaThroneMessenger Messenger = new ValoriaThroneMessenger();
     private static readonly IValoriaThroneMapOperations SharedMapOperations = new ValoriaThroneMapOperations(RuntimeRegistry, NullLogger<ValoriaThroneMapOperations>.Instance);
     private static readonly IValoriaThroneEventController SharedController = new ValoriaThroneEventController(RuntimeRegistry, SharedMapOperations, Messenger, StateStore, TimeProvider.System, NullLogger<ValoriaThroneEventController>.Instance);
-    private static readonly ValoriaThroneAdmissionPolicy SharedAdmissionPolicy = new(SharedController);
+    private static readonly ValoriaThroneAdmissionPolicy SharedAdmissionPolicy = new(SharedController, NullLogger<ValoriaThroneAdmissionPolicy>.Instance);
     private static readonly ValoriaThroneScheduler SharedScheduler = new(TimeProvider.System);
 
     private readonly IValoriaThroneEventController _controller;

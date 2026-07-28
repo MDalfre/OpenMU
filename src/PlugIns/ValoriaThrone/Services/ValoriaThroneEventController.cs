@@ -396,6 +396,8 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         Guid eventInstanceId = Guid.Empty;
         string? characterName = null;
         uint guildId = 0;
+
+        // First pass: validate the pickup conditions and collect the guild id.
         using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
         {
             if (this._eventInstanceId is not { } currentEventInstanceId || !this._mapOperations.IsCurrentCrown(droppedItem, currentEventInstanceId))
@@ -428,16 +430,6 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
                 eventInstanceId = currentEventInstanceId;
                 characterName = player.SelectedCharacter.Name;
                 guildId = player.GuildStatus.GuildId;
-                this._crown.GroundItemId = null;
-                this._crown.HolderCharacterId = player.SelectedCharacter.Id;
-                this._crown.HolderCharacterName = characterName;
-                this._crown.HolderGuildId = guildId;
-                this._crown.HolderGuildName = $"Guild {guildId}";
-                this._crown.PickedUpAt = this._timeProvider.GetUtcNow();
-                this._crown.DeliveryDeadline = this._crown.PickedUpAt.Value.Add(this._options.CrownDeliveryDuration);
-                this._crownCarrier = player;
-                this.State = ValoriaThroneEventState.CrownCarried;
-                await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -447,10 +439,41 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             return ValoriaCrownPickupResult.Rejected;
         }
 
+        // Resolve the guild name outside the lock to avoid async calls inside it.
+        var guildName = player.GameContext is IGameServerContext serverContext
+            ? (await serverContext.GuildServer.GetGuildAsync(guildId).ConfigureAwait(false))?.Name
+            : null;
+        guildName ??= guildId.ToString();
+
+        // Second pass: apply state changes now that all data is ready.
+        using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (this._eventInstanceId != eventInstanceId
+                || this.State != ValoriaThroneEventState.CrownOnGround
+                || this._crown is null
+                || this._crown.GroundItemId != droppedItem.Id)
+            {
+                // State changed while we were resolving the guild name; treat as rejected.
+                await this._messenger.SendToPlayerAsync(player, "A Coroa de Valoria ja nao esta disponivel.", cancellationToken).ConfigureAwait(false);
+                return ValoriaCrownPickupResult.Rejected;
+            }
+
+            this._crown.GroundItemId = null;
+            this._crown.HolderCharacterId = player.SelectedCharacter!.Id;
+            this._crown.HolderCharacterName = characterName;
+            this._crown.HolderGuildId = guildId;
+            this._crown.HolderGuildName = guildName;
+            this._crown.PickedUpAt = this._timeProvider.GetUtcNow();
+            this._crown.DeliveryDeadline = this._crown.PickedUpAt.Value.Add(this._options.CrownDeliveryDuration);
+            this._crownCarrier = player;
+            this.State = ValoriaThroneEventState.CrownCarried;
+            await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         await this._mapOperations.RemoveCrownAsync(eventInstanceId, cancellationToken).ConfigureAwait(false);
         await this.SetCrownCarrierMarkerAsync(player, true).ConfigureAwait(false);
-        this._logger.LogInformation("Valoria crown of {EventInstanceId} was claimed by {HolderCharacterId} from runtime guild {HolderGuildId}.", eventInstanceId, player.SelectedCharacter!.Id, guildId);
-        await this.BroadcastAsync($"{characterName}, da guild {guildId}, tomou a Coroa de Valoria! O portador possui {FormatDuration(this._options.CrownDeliveryDuration)} para alcancar o Senior.", cancellationToken).ConfigureAwait(false);
+        this._logger.LogInformation("Valoria crown of {EventInstanceId} was claimed by {HolderCharacterId} from guild {HolderGuildName} (runtime id {HolderGuildId}).", eventInstanceId, player.SelectedCharacter!.Id, guildName, guildId);
+        await this.BroadcastAsync($"{characterName}, da guild {guildName}, tomou a Coroa de Valoria! O portador possui {FormatDuration(this._options.CrownDeliveryDuration)} para alcancar o Senior.", cancellationToken).ConfigureAwait(false);
         return ValoriaCrownPickupResult.PickedUp;
     }
 
@@ -617,7 +640,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
                 this._coronationCandidate = player;
                 this._coronationSenior = npc;
                 await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
-                message = $"A coroacao de {this._crown.HolderCharacterName}, da guild {this._crown.HolderGuildId}, comecou. Protejam o candidato por {FormatDuration(this._options.CoronationDuration)}.";
+                message = $"A coroacao de {this._crown.HolderCharacterName}, da guild {this._crown.HolderGuildName}, comecou. Protejam o candidato por {FormatDuration(this._options.CoronationDuration)}.";
                 startedCoronation = true;
             }
         }
