@@ -24,7 +24,7 @@
   "LandsOfTrials": {
     "Enabled": true,
     "MapId": 31,
-    "GatekeeperNpcId": 223,
+    "GatekeeperNpcId": 220,
     "AllowImperialGuild": true,
     "AllowAlliances": true,
     "EntryPositionX": 64,

@@ -50,6 +50,9 @@ public interface IValoriaThroneEventController
     /// <summary>Determines whether the player currently carries the crown.</summary>
     bool IsCrownHolder(Player player);
 
+    /// <summary>Synchronizes the emperor status with the authoritative imperial reign.</summary>
+    ValueTask SynchronizeEmperorStatusAsync(Player player, CancellationToken cancellationToken);
+
     /// <summary>Determines whether the player may enter Lands of Trials.</summary>
     ValueTask<bool> CanEnterLandsOfTrialsAsync(Player player, CancellationToken cancellationToken);
 

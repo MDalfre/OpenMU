@@ -9,6 +9,7 @@ using System.Reflection;
 using MUnique.OpenMU.DataModel.Composition;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Configuration;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Domain;
+using MUnique.OpenMU.PlugIns.ValoriaThrone.Services;
 
 /// <summary>
 /// Tests for <see cref="ValoriaThroneOptions"/>.
@@ -44,6 +45,7 @@ public class ValoriaThroneOptionsTest
         Assert.That(options.CrownDeliveryDuration, Is.GreaterThan(TimeSpan.Zero));
         Assert.That(options.CrownRespawnDelay, Is.GreaterThanOrEqualTo(TimeSpan.Zero));
         Assert.That(options.SeniorNpcId, Is.EqualTo(223));
+        Assert.That(options.LandsOfTrials.GatekeeperNpcId, Is.EqualTo(220));
         Assert.That(options.CoronationConfirmationDuration, Is.GreaterThan(TimeSpan.Zero));
         Assert.That(options.CoronationDuration, Is.GreaterThan(TimeSpan.Zero));
         Assert.That(options.CoronationRadius, Is.GreaterThanOrEqualTo(0));
@@ -54,5 +56,16 @@ public class ValoriaThroneOptionsTest
         Assert.That(options.ImperialEras.MaximumChaosMachineSuccessRate, Is.EqualTo(100.0));
         Assert.That(options.ImperialEras.MaximumJewelSuccessRate, Is.EqualTo(100.0));
         Assert.That(options.ImperialEras.AffectedJewels, Is.EquivalentTo(new[] { ValoriaJewelKind.Soul, ValoriaJewelKind.Life, ValoriaJewelKind.Harmony }));
+    }
+
+    /// <summary>
+    /// Ensures the emperor status uses a client id independent from the Castle Siege crown and GM statuses.
+    /// </summary>
+    [Test]
+    public void ValoriaEmperorStatusUsesDedicatedClientEffectId()
+    {
+        Assert.That(ValoriaThroneEventController.ValoriaEmperorStatusId, Is.EqualTo(173));
+        Assert.That(ValoriaThroneEventController.ValoriaEmperorStatusId, Is.Not.EqualTo(20));
+        Assert.That(ValoriaThroneEventController.ValoriaEmperorStatusId, Is.Not.EqualTo(28));
     }
 }

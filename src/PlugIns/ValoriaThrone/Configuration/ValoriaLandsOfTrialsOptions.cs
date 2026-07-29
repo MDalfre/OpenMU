@@ -16,7 +16,7 @@ public sealed class ValoriaLandsOfTrialsOptions
     public byte MapId { get; set; } = 31;
 
     /// <summary>Gets or sets the NPC definition which grants access to the map.</summary>
-    public short GatekeeperNpcId { get; set; } = 223;
+    public short GatekeeperNpcId { get; set; } = 220;
 
     /// <summary>Gets or sets a value indicating whether imperial guild members may enter.</summary>
     public bool AllowImperialGuild { get; set; } = true;

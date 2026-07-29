@@ -19,6 +19,17 @@ using Nito.AsyncEx;
 /// </summary>
 public sealed class ValoriaThroneEventController : IValoriaThroneEventController
 {
+    /// <summary>The client status id reserved for the Valoria emperor.</summary>
+    public const short ValoriaEmperorStatusId = 173;
+
+    private static readonly MagicEffectDefinition ValoriaEmperorStatusDefinition = new()
+    {
+        Number = ValoriaEmperorStatusId,
+        InformObservers = true,
+        StopByDeath = false,
+        SendDuration = false,
+    };
+
     private readonly AsyncLock _lock = new();
     private readonly ValoriaThroneRuntimeRegistry _runtimeRegistry;
     private readonly IValoriaThroneMapOperations _mapOperations;
@@ -74,7 +85,9 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     {
         ValoriaThroneOptionsValidator.Validate(options);
         this._options = options;
-        this._activeReign = options.ImperialReign?.ExpiresAt > this._timeProvider.GetUtcNow() ? options.ImperialReign : null;
+        // The emperor status is authoritative until the next Valoria Throne starts.
+        // Do not discard the persisted reign merely because its legacy display period elapsed.
+        this._activeReign = options.ImperialReign;
         this._mapOperations.Configure(options);
         if (!options.Enabled)
         {
@@ -102,6 +115,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     public async ValueTask<bool> StartAsync(ValoriaThroneStartReason reason, CancellationToken cancellationToken)
     {
         Guid eventInstanceId;
+        ImperialReign? previousReign;
         using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
         {
             if (!this._options.Enabled || this.State != ValoriaThroneEventState.Idle)
@@ -110,6 +124,9 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             }
 
             eventInstanceId = Guid.NewGuid();
+            previousReign = this._activeReign;
+            this._activeReign = null;
+            this._options.ImperialReign = null;
             this._eventInstanceId = eventInstanceId;
             this._guardianId = null;
             this._crown = null;
@@ -120,6 +137,12 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             this.State = ValoriaThroneEventState.Announcing;
             this.SetNextTransition(this._options.AnnouncementDuration);
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        if (previousReign is not null)
+        {
+            await this.SynchronizeConnectedEmperorStatusAsync(previousReign.EmperorCharacterId, cancellationToken).ConfigureAwait(false);
         }
 
         this._logger.LogInformation("Valoria Throne {EventInstanceId} started by {Reason}.", eventInstanceId, reason);
@@ -197,14 +220,6 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     /// <inheritdoc />
     public async ValueTask TickAsync(CancellationToken cancellationToken)
     {
-        if (this._activeReign?.ExpiresAt <= this._timeProvider.GetUtcNow())
-        {
-            this._activeReign = null;
-            this._options.ImperialReign = null;
-            await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
-            await this._mapOperations.EvacuateLandsOfTrialsAsync(cancellationToken).ConfigureAwait(false);
-        }
-
         await this.SelectDefaultEraIfDueAsync(cancellationToken).ConfigureAwait(false);
         if (Interlocked.Exchange(ref this._administratorStartRequested, 0) == 1)
         {
@@ -492,6 +507,13 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
                 return false;
             }
 
+            // The winner identity was captured when the coronation started. A disconnect
+            // during the final stage must neither erase it nor open a second coronation.
+            if (this.State == ValoriaThroneEventState.CoronationInProgress)
+            {
+                return true;
+            }
+
             eventInstanceId = currentEventInstanceId;
             crown.ClearHolder();
             this._crownCarrier = null;
@@ -513,6 +535,26 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     {
         return (this.State is ValoriaThroneEventState.CrownCarried or ValoriaThroneEventState.CoronationInProgress)
                && this._crown?.HolderCharacterId == player.SelectedCharacter?.Id;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask SynchronizeEmperorStatusAsync(Player player, CancellationToken cancellationToken)
+    {
+        var isCurrentEmperor = this._activeReign?.EmperorCharacterId == player.SelectedCharacter?.Id;
+        if (isCurrentEmperor)
+        {
+            if (!player.MagicEffectList.ActiveEffects.ContainsKey(ValoriaEmperorStatusId))
+            {
+                await player.MagicEffectList.AddEffectAsync(new MagicEffect(Timeout.InfiniteTimeSpan, ValoriaEmperorStatusDefinition)).ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        if (player.MagicEffectList.ActiveEffects.TryGetValue(ValoriaEmperorStatusId, out var status))
+        {
+            await status.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
@@ -711,30 +753,35 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
 
     private async ValueTask CompleteCoronationAsync(Guid eventInstanceId, CancellationToken cancellationToken)
     {
-        string winnerMessage;
+        string coronationCompletedMessage;
+        string newEmperorMessage;
+        Guid winnerCharacterId;
         using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
         {
             if (this._eventInstanceId != eventInstanceId
                 || this.State != ValoriaThroneEventState.CoronationInProgress
-                || this._crown is null
-                || !this.IsCoronationCandidateValid())
+                || this._crown is null)
             {
                 return;
             }
 
             this._activeReign = new ImperialReign { Id = Guid.NewGuid(), EmperorCharacterId = this._crown.HolderCharacterId!.Value, EmperorCharacterName = this._crown.HolderCharacterName ?? string.Empty, ImperialGuildId = this._crown.HolderGuildId!.Value, ImperialGuildName = this._crown.HolderGuildName ?? string.Empty, StartedAt = this._timeProvider.GetUtcNow(), ExpiresAt = this._timeProvider.GetUtcNow().Add(this._options.ReignDuration) };
             this._options.ImperialReign = this._activeReign;
-            winnerMessage = $"{this._activeReign.EmperorCharacterName}, da guild {this._activeReign.ImperialGuildName}, foi coroado Imperador de Valoria!";
+            winnerCharacterId = this._activeReign.EmperorCharacterId;
+            coronationCompletedMessage = $"A coroação de {this._activeReign.EmperorCharacterName} foi concluída";
+            newEmperorMessage = $"{this._activeReign.EmperorCharacterName} é o novo imperador de Valoria";
             this.State = ValoriaThroneEventState.Finishing;
             this._nextTransitionAt = null;
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
 
         await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        await this.SynchronizeConnectedEmperorStatusAsync(winnerCharacterId, cancellationToken).ConfigureAwait(false);
         await this._mapOperations.EvacuateLandsOfTrialsAsync(cancellationToken).ConfigureAwait(false);
 
         this._logger.LogInformation("Valoria coronation completed for {EventInstanceId}, character {HolderCharacterId}, runtime guild {HolderGuildId}.", eventInstanceId, this._crown?.HolderCharacterId, this._crown?.HolderGuildId);
-        await this.BroadcastAsync(winnerMessage, cancellationToken).ConfigureAwait(false);
+        await this.BroadcastAsync(coronationCompletedMessage, cancellationToken).ConfigureAwait(false);
+        await this.BroadcastAsync(newEmperorMessage, cancellationToken).ConfigureAwait(false);
         await this.StopAsync(ValoriaThroneStopReason.Completed, cancellationToken).ConfigureAwait(false);
     }
 
@@ -882,6 +929,11 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
 
     private string CreateCountdownMessage(ValoriaThroneEventState state, TimeSpan remaining)
     {
+        if (state == ValoriaThroneEventState.CoronationInProgress && this._crown?.HolderCharacterName is { Length: > 0 } playerName)
+        {
+            return $"{playerName} será coroado imperador em {FormatDuration(remaining)}";
+        }
+
         var phase = state switch
         {
             ValoriaThroneEventState.Announcing => "O Trono de Valoria começará",
@@ -912,6 +964,20 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         foreach (var context in this._runtimeRegistry.Contexts)
         {
             await this._messenger.SendGlobalAsync(context, message, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask SynchronizeConnectedEmperorStatusAsync(Guid emperorCharacterId, CancellationToken cancellationToken)
+    {
+        foreach (var context in this._runtimeRegistry.Contexts)
+        {
+            foreach (var player in await context.GetPlayersAsync().ConfigureAwait(false))
+            {
+                if (player.SelectedCharacter?.Id == emperorCharacterId || player.MagicEffectList.ActiveEffects.ContainsKey(ValoriaEmperorStatusId))
+                {
+                    await this.SynchronizeEmperorStatusAsync(player, cancellationToken).ConfigureAwait(false);
+                }
+            }
         }
     }
 

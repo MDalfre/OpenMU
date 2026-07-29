@@ -203,6 +203,11 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
             await this._controller.HandleCrownHolderLostAsync(player, "O Portador da Coroa saiu do campo de batalha.", CancellationToken.None).ConfigureAwait(false);
         }
 
+        if (previousState == PlayerState.CharacterSelection && currentState == PlayerState.EnteredWorld)
+        {
+            await this._controller.SynchronizeEmperorStatusAsync(player, CancellationToken.None).ConfigureAwait(false);
+        }
+
         if (previousState != PlayerState.CharacterSelection || currentState != PlayerState.EnteredWorld || this._controller.ActiveReign is not { SelectedEra: not ImperialEra.None } reign)
         {
             return;
