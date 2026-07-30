@@ -56,7 +56,8 @@ public class DeActivateMagicEffectPlugIn : IActivateMagicEffectPlugIn, IDeactiva
 
     private async ValueTask SendMagicEffectStatusAsync(MagicEffect effect, IAttackable affectedObject, bool isActive, TimeSpan duration)
     {
-        if (!(this._player.Connection?.Connected ?? false)
+        var connection = this._player.Connection;
+        if (!(connection?.Connected ?? false)
             || effect.Definition.Number <= 0)
         {
             return;
@@ -73,7 +74,7 @@ public class DeActivateMagicEffectPlugIn : IActivateMagicEffectPlugIn, IDeactiva
                 {
                     var origin = EffectItemConsumption.EffectOrigin.HalloweenAndCherryBlossomEvent; // Basically, all normal consumable items which add effects
                     var action = EffectItemConsumption.EffectAction.Add;
-                    await this._player.Connection.SendEffectItemConsumptionAsync(origin, effectType, action, (uint)duration.TotalSeconds, (byte)effect.Definition.Number).ConfigureAwait(false);
+                    await connection.SendEffectItemConsumptionAsync(origin, effectType, action, (uint)duration.TotalSeconds, (byte)effect.Definition.Number).ConfigureAwait(false);
                     effectWasSent = true;
                 }
             }
@@ -81,7 +82,7 @@ public class DeActivateMagicEffectPlugIn : IActivateMagicEffectPlugIn, IDeactiva
 
         if (!effectWasSent)
         {
-            await this._player.Connection.SendMagicEffectStatusAsync(isActive, objectId, (byte)effect.Id).ConfigureAwait(false);
+            await connection.SendMagicEffectStatusAsync(isActive, objectId, (byte)effect.Id).ConfigureAwait(false);
         }
     }
 }

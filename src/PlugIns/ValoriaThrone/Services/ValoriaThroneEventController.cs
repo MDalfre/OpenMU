@@ -277,7 +277,9 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
         {
             var now = this._timeProvider.GetUtcNow();
-            if (this._nextTransitionAt is { } nextTransitionAt && nextTransitionAt > now)
+            if ((this.State == ValoriaThroneEventState.CrownCarried && this._crown?.DeliveryDeadline <= now)
+                || (this.State == ValoriaThroneEventState.CoronationInProgress && this._crown?.CoronationEndsAt <= now)
+                || (this._nextTransitionAt is { } nextTransitionAt && nextTransitionAt > now))
             {
                 state = this.State;
                 eventInstanceId = this._eventInstanceId;
@@ -300,7 +302,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
                 }
                 else
                 {
-                    countdownMessage = this.GetCountdownMessage(this.State, nextTransitionAt - now);
+                    countdownMessage = this.GetCountdownMessage(this.State, this._nextTransitionAt!.Value - now);
                     isWaitingForTransition = true;
                 }
             }
