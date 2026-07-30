@@ -18,10 +18,16 @@ public sealed class ValoriaThroneRuntimeRegistry
     /// Registers a local game-server context.
     /// </summary>
     /// <param name="context">The context to register.</param>
-    public void Register(IGameServerContext context)
+    public bool Register(IGameServerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (this._contexts.TryGetValue(context.Id, out var registeredContext) && ReferenceEquals(registeredContext, context))
+        {
+            return false;
+        }
+
         this._contexts[context.Id] = context;
+        return true;
     }
 
     /// <summary>

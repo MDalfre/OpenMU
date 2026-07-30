@@ -123,8 +123,10 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     /// <inheritdoc />
     public void Register(IGameServerContext context)
     {
-        this._runtimeRegistry.Register(context);
-        this._logger.LogInformation("Valoria context registered | GameConfigurationId: {GameConfigurationId} | GameConfigurationName: {GameConfigurationName} | ServerId: {ServerId}", GetPersistentId(context.Configuration), context.Configuration.Name, context.Id);
+        if (this._runtimeRegistry.Register(context))
+        {
+            this._logger.LogInformation("Valoria context registered | GameConfigurationId: {GameConfigurationId} | GameConfigurationName: {GameConfigurationName} | ServerId: {ServerId}", GetPersistentId(context.Configuration), context.Configuration.Name, context.Id);
+        }
     }
 
     /// <inheritdoc />
@@ -519,6 +521,9 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             this._crown.DeliveryDeadline = this._crown.PickedUpAt.Value.Add(this._options.CrownDeliveryDuration);
             this._crownCarrier = player;
             this.State = ValoriaThroneEventState.CrownCarried;
+            // The crown-on-ground timeout only applies until it is collected. From
+            // this point the carrier gets the independently configured delivery time.
+            this.SetNextTransition(this._options.CrownDeliveryDuration);
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -749,7 +754,11 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
                 this.State = ValoriaThroneEventState.CoronationInProgress;
                 this._coronationCandidate = player;
                 this._coronationSenior = npc;
+                // Do not retain the carrier deadline. TickAsync uses this transition
+                // deadline to decide whether the event has timed out.
+                this.SetNextTransition(this._options.CoronationDuration);
                 await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+                this._logger.LogInformation("Valoria coronation started | EventInstanceId: {EventInstanceId} | EmperorCharacterId: {EmperorCharacterId} | ImperialGuildId: {ImperialGuildId} | EndsAt: {EndsAt}", this._eventInstanceId, this._crown.HolderCharacterId, this._crown.HolderGuildId, this._crown.CoronationEndsAt);
                 message = $"A coroacao de {this._crown.HolderCharacterName}, da guild {this._crown.HolderGuildName}, comecou. Protejam o candidato por {FormatDuration(this._options.CoronationDuration)}.";
                 startedCoronation = true;
             }
