@@ -26,6 +26,12 @@ using MUnique.OpenMU.PlugIns;
 [MinimumClient(5, 0, ClientLanguage.Invariant)]
 public class NewPlayersInScopePlugIn : INewPlayersInScopePlugIn
 {
+    // Reserved by the Valoria Throne protocol for the crown carrier. Keeping this
+    // in the viewport serializer makes the marker recoverable after a refresh,
+    // teleport, reconnect, or a player entering scope later.
+    private const short ValoriaCrownCarrierStatusId = 20;
+    private const byte ValoriaCrownCarrierMarkerId = 1;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="NewPlayersInScopePlugIn"/> class.
     /// </summary>
@@ -46,6 +52,12 @@ public class NewPlayersInScopePlugIn : INewPlayersInScopePlugIn
         }
 
         var (shopPlayers, guildPlayers) = await this.SendCharactersAsync(newPlayers, isSpawned).ConfigureAwait(false);
+
+        foreach (var crownCarrier in newPlayers.Where(player => player.MagicEffectList.ActiveEffects.ContainsKey(ValoriaCrownCarrierStatusId)))
+        {
+            await this.Player.InvokeViewPlugInAsync<IWorldObjectMarkerPlugIn>(
+                view => view.SetMarkerAsync(crownCarrier, ValoriaCrownCarrierMarkerId, true)).ConfigureAwait(false);
+        }
 
         if (shopPlayers != null)
         {

@@ -19,8 +19,19 @@ using Nito.AsyncEx;
 /// </summary>
 public sealed class ValoriaThroneEventController : IValoriaThroneEventController
 {
+    /// <summary>The client status id reserved for the Valoria crown carrier.</summary>
+    public const short CrownCarrierStatusId = 20;
+
     /// <summary>The client status id reserved for the Valoria emperor.</summary>
     public const short ValoriaEmperorStatusId = 173;
+
+    private static readonly MagicEffectDefinition CrownCarrierStatusDefinition = new()
+    {
+        Number = CrownCarrierStatusId,
+        InformObservers = true,
+        StopByDeath = false,
+        SendDuration = false,
+    };
 
     private static readonly MagicEffectDefinition ValoriaEmperorStatusDefinition = new()
     {
@@ -84,10 +95,20 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     public void Configure(ValoriaThroneOptions options)
     {
         ValoriaThroneOptionsValidator.Validate(options);
+        var configuredReign = options.ImperialReign;
         this._options = options;
-        // The emperor status is authoritative until the next Valoria Throne starts.
-        // Do not discard the persisted reign merely because its legacy display period elapsed.
-        this._activeReign = options.ImperialReign;
+        // A process hosts one global Valoria event. Configurations are loaded once per
+        // game configuration, so an empty or older entry must never erase the reign
+        // already accepted from another configuration.
+        this._activeReign = SelectAuthoritativeReign(this._activeReign, configuredReign);
+        this._options.ImperialReign = CloneReign(this._activeReign);
+        this._logger.LogInformation(
+            "Valoria Configure | ServerId: {ServerId} | EmperorCharacterId: {EmperorCharacterId} | ImperialGuildId: {ImperialGuildId} | SelectedEra: {SelectedEra} | StartedAt: {StartedAt}",
+            this._options.EventServerId,
+            this._activeReign?.EmperorCharacterId,
+            this._activeReign?.ImperialGuildId,
+            this._activeReign?.SelectedEra,
+            this._activeReign?.StartedAt);
         this._mapOperations.Configure(options);
         if (!options.Enabled)
         {
@@ -103,6 +124,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     public void Register(IGameServerContext context)
     {
         this._runtimeRegistry.Register(context);
+        this._logger.LogInformation("Valoria context registered | GameConfigurationId: {GameConfigurationId} | GameConfigurationName: {GameConfigurationName} | ServerId: {ServerId}", GetPersistentId(context.Configuration), context.Configuration.Name, context.Id);
     }
 
     /// <inheritdoc />
@@ -139,7 +161,18 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        if (!await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false))
+        {
+            using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+            {
+                this._activeReign = previousReign;
+                this._options.ImperialReign = CloneReign(previousReign);
+            }
+
+            this._logger.LogError("Valoria event {EventInstanceId} started, but the previous reign could not be cleared persistently.", eventInstanceId);
+            await this.StopAsync(ValoriaThroneStopReason.Failure, cancellationToken).ConfigureAwait(false);
+            return false;
+        }
         if (previousReign is not null)
         {
             await this.SynchronizeConnectedEmperorStatusAsync(previousReign.EmperorCharacterId, cancellationToken).ConfigureAwait(false);
@@ -175,6 +208,10 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         try
         {
             await this.SetCrownCarrierMarkerAsync(crownCarrier, false).ConfigureAwait(false);
+            if (crownCarrier is not null)
+            {
+                await this.SynchronizeCrownCarrierStatusAsync(crownCarrier, false).ConfigureAwait(false);
+            }
             await this._mapOperations.CleanupAsync(eventInstanceId, cancellationToken).ConfigureAwait(false);
             await this.BroadcastAsync("A batalha terminou.", cancellationToken).ConfigureAwait(false);
         }
@@ -486,6 +523,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         }
 
         await this._mapOperations.RemoveCrownAsync(eventInstanceId, cancellationToken).ConfigureAwait(false);
+        await this.SynchronizeCrownCarrierStatusAsync(player, true).ConfigureAwait(false);
         await this.SetCrownCarrierMarkerAsync(player, true).ConfigureAwait(false);
         this._logger.LogInformation("Valoria crown of {EventInstanceId} was claimed by {HolderCharacterId} from guild {HolderGuildName} (runtime id {HolderGuildId}).", eventInstanceId, player.SelectedCharacter!.Id, guildName, guildId);
         await this.BroadcastAsync($"{characterName}, da guild {guildName}, tomou a Coroa de Valoria! O portador possui {FormatDuration(this._options.CrownDeliveryDuration)} para alcancar o Senior.", cancellationToken).ConfigureAwait(false);
@@ -525,6 +563,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         }
 
         await this.SetCrownCarrierMarkerAsync(player, false).ConfigureAwait(false);
+        await this.SynchronizeCrownCarrierStatusAsync(player, false).ConfigureAwait(false);
         this._logger.LogInformation("Valoria crown holder {CharacterId} lost the crown during {EventInstanceId}: {Reason}.", player.SelectedCharacter?.Id, eventInstanceId, reason);
         await this.BroadcastAsync($"{reason} A Coroa de Valoria retornara ao local da queda do Guardiao em {FormatDuration(this._options.CrownRespawnDelay)}.", cancellationToken).ConfigureAwait(false);
         return true;
@@ -557,6 +596,27 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         }
     }
 
+    private async ValueTask SynchronizeCrownCarrierStatusAsync(Player player, bool isCarrier)
+    {
+        if (isCarrier)
+        {
+            if (!player.MagicEffectList.ActiveEffects.ContainsKey(CrownCarrierStatusId))
+            {
+                await player.MagicEffectList.AddEffectAsync(new MagicEffect(Timeout.InfiniteTimeSpan, CrownCarrierStatusDefinition)).ConfigureAwait(false);
+            }
+
+            this._logger.LogInformation("Valoria crown status synchronized | CharacterId: {CharacterId} | StatusId: {StatusId} | Active: true", player.SelectedCharacter?.Id, CrownCarrierStatusId);
+            return;
+        }
+
+        if (player.MagicEffectList.ActiveEffects.TryGetValue(CrownCarrierStatusId, out var status))
+        {
+            await status.DisposeAsync().ConfigureAwait(false);
+        }
+
+        this._logger.LogInformation("Valoria crown status synchronized | CharacterId: {CharacterId} | StatusId: {StatusId} | Active: false", player.SelectedCharacter?.Id, CrownCarrierStatusId);
+    }
+
     /// <inheritdoc />
     public async ValueTask<bool> CanEnterLandsOfTrialsAsync(Player player, CancellationToken cancellationToken)
     {
@@ -585,9 +645,17 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             return false;
         }
 
+        var previousEra = reign.SelectedEra;
+        var previousSelectedAt = reign.EraSelectedAt;
         reign.SelectedEra = era;
         reign.EraSelectedAt = this._timeProvider.GetUtcNow();
-        await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        if (!await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false))
+        {
+            reign.SelectedEra = previousEra;
+            reign.EraSelectedAt = previousSelectedAt;
+            await this._messenger.SendToPlayerAsync(player, "A Era não foi proclamada porque não foi possível persistir o reinado.", cancellationToken).ConfigureAwait(false);
+            return false;
+        }
         await this.BroadcastAsync($"O Imperador {reign.EmperorCharacterName}, da guild {reign.ImperialGuildName}, proclamou a {ImperialEraPresentation.GetName(era)}! {this.GetEraDescription(era)}", cancellationToken).ConfigureAwait(false);
         return true;
     }
@@ -775,7 +843,23 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        if (!await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false))
+        {
+            // Keep the candidate and crown context intact. The next tick can safely
+            // retry persistence; do not announce an emperor which was not saved.
+            using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (this._eventInstanceId == eventInstanceId && this.State == ValoriaThroneEventState.Finishing)
+                {
+                    this.State = ValoriaThroneEventState.CoronationInProgress;
+                    this.SetNextTransition(TimeSpan.FromSeconds(30));
+                    await this.SaveSnapshotAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            await this.BroadcastAsync("A coroação aguarda a confirmação de persistência. Administradores devem verificar os logs do Valoria.", cancellationToken).ConfigureAwait(false);
+            return;
+        }
         await this.SynchronizeConnectedEmperorStatusAsync(winnerCharacterId, cancellationToken).ConfigureAwait(false);
         await this._mapOperations.EvacuateLandsOfTrialsAsync(cancellationToken).ConfigureAwait(false);
 
@@ -864,6 +948,10 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         }
 
         await this.SetCrownCarrierMarkerAsync(crownCarrier, false).ConfigureAwait(false);
+        if (crownCarrier is not null)
+        {
+            await this.SynchronizeCrownCarrierStatusAsync(crownCarrier, false).ConfigureAwait(false);
+        }
         await this.BroadcastAsync($"{announcement} A Coroa retornara ao local da queda do Guardiao em {FormatDuration(this._options.CrownRespawnDelay)}.", cancellationToken).ConfigureAwait(false);
     }
 
@@ -986,25 +1074,76 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         return this._stateStore.SaveAsync(this.GetSnapshot(), cancellationToken);
     }
 
-    private async ValueTask PersistConfigurationAsync(CancellationToken cancellationToken)
+    private async ValueTask<bool> PersistConfigurationAsync(CancellationToken cancellationToken)
     {
         var context = this._runtimeRegistry.Contexts.FirstOrDefault();
         if (context is null)
         {
-            return;
+            this._logger.LogError("Valoria persistence failed because no game-server context is registered.");
+            return false;
         }
 
-        using var persistenceContext = context.PersistenceContextProvider.CreateNewContext();
-        var configuration = (await persistenceContext.GetAsync<GameConfiguration>(cancellationToken).ConfigureAwait(false)).FirstOrDefault();
-        var plugInConfiguration = configuration?.PlugInConfigurations.FirstOrDefault(item => item.TypeId == typeof(ValoriaThronePlugIn).GUID);
-        if (plugInConfiguration is null)
+        try
         {
-            return;
+            using var persistenceContext = context.PersistenceContextProvider.CreateNewContext();
+            var configurations = await persistenceContext.GetAsync<GameConfiguration>(cancellationToken).ConfigureAwait(false);
+            var targets = configurations
+                .SelectMany(configuration => configuration.PlugInConfigurations
+                    .Where(plugInConfiguration => plugInConfiguration.TypeId == typeof(ValoriaThronePlugIn).GUID)
+                    .Select(plugInConfiguration => (configuration, plugInConfiguration)))
+                .ToArray();
+            if (targets.Length == 0)
+            {
+                this._logger.LogError("Valoria persistence failed because no ValoriaThrone PlugInConfiguration was found.");
+                return false;
+            }
+
+            foreach (var (configuration, plugInConfiguration) in targets)
+            {
+                var persistedOptions = plugInConfiguration.GetConfiguration<ValoriaThroneOptions>(context.PlugInManager.CustomConfigReferenceHandler) ?? ValoriaThroneOptions.Default;
+                persistedOptions.ImperialReign = CloneReign(this._activeReign);
+                plugInConfiguration.SetConfiguration(persistedOptions, context.PlugInManager.CustomConfigReferenceHandler);
+                this._logger.LogInformation("Valoria persistence target | GameConfigurationId: {GameConfigurationId} | GameConfigurationName: {GameConfigurationName} | PlugInConfigurationId: {PlugInConfigurationId} | ServerId: {ServerId} | EmperorCharacterId: {EmperorCharacterId} | ImperialGuildId: {ImperialGuildId} | SelectedEra: {SelectedEra}", GetPersistentId(configuration), configuration.Name, GetPersistentId(plugInConfiguration), context.Id, this._activeReign?.EmperorCharacterId, this._activeReign?.ImperialGuildId, this._activeReign?.SelectedEra);
+            }
+
+            await persistenceContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            this._logger.LogError(exception, "Valoria persistence failed | EmperorCharacterId: {EmperorCharacterId} | ImperialGuildId: {ImperialGuildId} | SelectedEra: {SelectedEra}", this._activeReign?.EmperorCharacterId, this._activeReign?.ImperialGuildId, this._activeReign?.SelectedEra);
+            return false;
+        }
+    }
+
+    private static ImperialReign? SelectAuthoritativeReign(ImperialReign? current, ImperialReign? candidate)
+    {
+        if (candidate is null)
+        {
+            return current;
         }
 
-        plugInConfiguration.SetConfiguration(this._options, context.PlugInManager.CustomConfigReferenceHandler);
-        await persistenceContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return current is null || candidate.StartedAt > current.StartedAt || (candidate.StartedAt == current.StartedAt && candidate.Id.CompareTo(current.Id) > 0)
+            ? CloneReign(candidate)
+            : current;
     }
+
+    private static ImperialReign? CloneReign(ImperialReign? reign) => reign is null
+        ? null
+        : new ImperialReign
+        {
+            Id = reign.Id,
+            EmperorCharacterId = reign.EmperorCharacterId,
+            EmperorCharacterName = reign.EmperorCharacterName,
+            ImperialGuildId = reign.ImperialGuildId,
+            ImperialGuildName = reign.ImperialGuildName,
+            StartedAt = reign.StartedAt,
+            ExpiresAt = reign.ExpiresAt,
+            SelectedEra = reign.SelectedEra,
+            EraSelectedAt = reign.EraSelectedAt,
+        };
+
+    private static Guid? GetPersistentId(object value) => (value as MUnique.OpenMU.Persistence.IIdentifiable)?.Id;
 
     private async ValueTask SelectDefaultEraIfDueAsync(CancellationToken cancellationToken)
     {
@@ -1016,7 +1155,13 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
 
         reign.SelectedEra = this._options.ImperialEras.DefaultEra;
         reign.EraSelectedAt = this._timeProvider.GetUtcNow();
-        await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        if (!await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false))
+        {
+            reign.SelectedEra = ImperialEra.None;
+            reign.EraSelectedAt = null;
+            this._logger.LogError("Valoria default era was not announced because persistence failed | EmperorCharacterId: {EmperorCharacterId}", reign.EmperorCharacterId);
+            return;
+        }
         await this.BroadcastAsync($"O prazo de escolha terminou. {ImperialEraPresentation.GetName(reign.SelectedEra)} foi proclamada automaticamente. {this.GetEraDescription(reign.SelectedEra)}", cancellationToken).ConfigureAwait(false);
     }
 }
