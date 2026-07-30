@@ -4,12 +4,14 @@
 
 namespace MUnique.OpenMU.PlugIns.ValoriaThrone.Configuration;
 
+using System.ComponentModel.DataAnnotations;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Domain;
 
 /// <summary>Configures imperial era selection and benefits.</summary>
 public sealed class ValoriaImperialEraOptions
 {
     /// <summary>Gets or sets the time allowed to select an era.</summary>
+    [Display(Name = "Prazo para escolher a Era (minutos)")]
     public TimeSpan SelectionDuration { get; set; } = TimeSpan.FromMinutes(30);
 
     /// <summary>Gets or sets the era selected after the deadline.</summary>

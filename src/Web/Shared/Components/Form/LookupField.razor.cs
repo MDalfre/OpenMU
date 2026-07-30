@@ -7,6 +7,7 @@ namespace MUnique.OpenMU.Web.Shared.Components.Form;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Components;
+using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.Persistence;
 using MUnique.OpenMU.Web.Shared.Services;
 
@@ -47,7 +48,7 @@ public partial class LookupField<TObject>
     /// Gets or sets the caption factory.
     /// </summary>
     [Parameter]
-    public Func<TObject, string> CaptionFactory { get; set; } = obj => obj.GetName();
+    public Func<TObject, string> CaptionFactory { get; set; } = CreateCaption;
 
     private ILookupController EffectiveLookupController => this.ExplicitLookupController ?? this.LookupController;
 
@@ -55,5 +56,17 @@ public partial class LookupField<TObject>
     protected override bool TryParseValueFromString(string? value, [MaybeNullWhen(false)] out TObject result, [NotNullWhen(false)] out string? validationErrorMessage)
     {
         throw new NotImplementedException();
+    }
+
+    private static string CreateCaption(TObject value)
+    {
+        if (value is not Skill skill)
+        {
+            return value.GetName();
+        }
+
+        var skillName = skill.GetName();
+        var name = string.IsNullOrWhiteSpace(skillName) ? "Skill sem nome" : skillName;
+        return $"{skill.Number} - {name}";
     }
 }

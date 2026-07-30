@@ -49,7 +49,11 @@ public class PersistentObjectsLookupController : ILookupController
 
             var owner = await this._gameConfigurationSource.GetOwnerAsync().ConfigureAwait(true);
             IEnumerable<T> values;
-            if (this._gameConfigurationSource.IsSupporting(typeof(T))
+            if (typeof(T) == typeof(Skill))
+            {
+                values = owner.Skills.Cast<T>();
+            }
+            else if (this._gameConfigurationSource.IsSupporting(typeof(T))
                 && persistenceContext?.IsSupporting(typeof(T)) is not true)
             {
                 values = this._gameConfigurationSource.GetAll<T>();
@@ -78,7 +82,7 @@ public class PersistentObjectsLookupController : ILookupController
 
             foreach (var word in searchWords)
             {
-                query = query.Where(v => v.GetName().Contains(word, StringComparison.OrdinalIgnoreCase));
+                query = query.Where(v => Matches(v, word));
             }
 
             return query.Distinct();
@@ -89,5 +93,12 @@ public class PersistentObjectsLookupController : ILookupController
         }
 
         return Enumerable.Empty<T>();
+    }
+
+    private static bool Matches<T>(T value, string searchWord)
+        where T : class
+    {
+        return (value.GetName() ?? string.Empty).Contains(searchWord, StringComparison.OrdinalIgnoreCase)
+               || (value is Skill skill && skill.Number.ToString(System.Globalization.CultureInfo.InvariantCulture).Contains(searchWord, StringComparison.OrdinalIgnoreCase));
     }
 }

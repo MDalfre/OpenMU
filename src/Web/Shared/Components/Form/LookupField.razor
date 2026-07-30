@@ -12,7 +12,7 @@
                @bind-Value="@this.CurrentValue"
                SearchMethod="@((text, _) => this.EffectiveLookupController.GetSuggestionsAsync<TObject>(text, this.PersistenceContext))"
                EnableDropDown="true"
-               MaximumSuggestions="20"
+               MaximumSuggestions="@(typeof(TObject) == typeof(MUnique.OpenMU.DataModel.Configuration.Skill) ? int.MaxValue : 20)"
                Placeholder="Search ..."
                Id="@this.FieldIdentifier.FieldName">
         <SelectedTemplate Context="item">

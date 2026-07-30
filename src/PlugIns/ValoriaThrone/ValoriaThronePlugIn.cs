@@ -15,6 +15,7 @@ using MUnique.OpenMU.GameLogic.PlayerActions.Craftings;
 using MUnique.OpenMU.GameLogic.PlayerActions.Items;
 using MUnique.OpenMU.GameLogic.PlugIns;
 using MUnique.OpenMU.GameLogic.PlugIns.ChatCommands;
+using MUnique.OpenMU.GameLogic.Views.Character;
 using MUnique.OpenMU.PlugIns;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Configuration;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Domain;
@@ -193,6 +194,11 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
     {
         var result = await this._controller.HandleSeniorInteractionAsync(player, npc, CancellationToken.None).ConfigureAwait(false);
         eventArgs.HasBeenHandled = result != ValoriaSeniorInteractionResult.NotSenior;
+        if (result == ValoriaSeniorInteractionResult.EraSelectionRequested)
+        {
+            await player.InvokeViewPlugInAsync<IShowDialogPlugIn>(
+                plugIn => plugIn.ShowDialogAsync(ValoriaEraDialogProtocol.CommandCategory, ValoriaEraDialogProtocol.Open)).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />

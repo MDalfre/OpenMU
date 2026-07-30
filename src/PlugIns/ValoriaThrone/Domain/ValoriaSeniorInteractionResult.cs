@@ -18,6 +18,9 @@ public enum ValoriaSeniorInteractionResult
     /// <summary>The player must confirm the coronation by talking again.</summary>
     ConfirmationRequested,
 
+    /// <summary>The client should show the Era selection dialog.</summary>
+    EraSelectionRequested,
+
     /// <summary>The coronation has started.</summary>
     CoronationStarted,
 }

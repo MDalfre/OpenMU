@@ -14,7 +14,9 @@ Antes de habilitar, confirme:
 - `CrownVisualItemLevel` deve permanecer entre `0` e `15`. O cliente customizado reconhece por padrão o nível `15`.
 - Os horários do agendamento são interpretados em `Schedule.TimeZone`.
 
-As durações são `TimeSpan`. No JSON, use o formato `d.hh:mm:ss`.
+As durações são `TimeSpan`. O painel exibe e aceita minutos, incluindo valores
+decimais como `0,5`; a conversão para o formato `d.hh:mm:ss` esperado pela API
+ocorre somente no formulário. No JSON, continue usando `d.hh:mm:ss`.
 
 ## Comandos
 
@@ -32,6 +34,11 @@ Comandos de jogador:
 
 - `/era <Ascension|Fortune|Freedom|Luck>`: permite ao Imperador escolher uma vez durante o prazo.
 - `/imperador`: mostra Imperador, Guild Imperial, Era, benefício e término do reinado.
+
+Depois da coroação, durante `Idle` ou `Cooldown`, o Imperador também pode falar
+com o Senior configurado. O cliente customizado abre quatro opções de Era; cada
+opção percorre exatamente a mesma validação e persistência de `/era`. Outros
+jogadores não recebem o menu e uma Era já proclamada é apenas informada.
 
 ## Etapas
 
@@ -75,7 +82,7 @@ O estado operacional usa snapshots e o reinado é armazenado dentro da configura
 4. Mate o Guardião e confirme o modelo Crown no chão.
 5. Colete a Coroa e confirme o marcador visual sem ocupar pet ou helm.
 6. Morra, desconecte ou saia do mapa com o portador e confirme remoção do marcador e respawn.
-7. Conclua a coroação, selecione cada Era e valide `/imperador`.
+7. Conclua a coroação, selecione cada Era pelo Senior e por `/era`, e valide `/imperador`.
 8. Na Era Luck, altere itens na Chaos Machine e compare a taxa exibida com o resultado efetivo.
 9. Teste Soul, Life, Harmony e uma joia não configurada.
 10. Valide entrada e expulsão de Lands of Trials para guild, aliança e jogador externo.

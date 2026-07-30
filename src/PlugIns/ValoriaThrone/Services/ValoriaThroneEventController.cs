@@ -646,24 +646,31 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     /// <inheritdoc />
     public async ValueTask<bool> SelectEraAsync(Player player, ImperialEra era, CancellationToken cancellationToken)
     {
-        var reign = this._activeReign;
-        if (era == ImperialEra.None || reign is null || reign.SelectedEra != ImperialEra.None || player.SelectedCharacter?.Id != reign.EmperorCharacterId)
+        string announcement;
+        using (await this._lock.LockAsync(cancellationToken).ConfigureAwait(false))
         {
-            return false;
+            var reign = this._activeReign;
+            if (!this.CanSelectEra(player, era, reign))
+            {
+                return false;
+            }
+
+            var previousEra = reign!.SelectedEra;
+            var previousSelectedAt = reign.EraSelectedAt;
+            reign.SelectedEra = era;
+            reign.EraSelectedAt = this._timeProvider.GetUtcNow();
+            if (!await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false))
+            {
+                reign.SelectedEra = previousEra;
+                reign.EraSelectedAt = previousSelectedAt;
+                await this._messenger.SendToPlayerAsync(player, "A Era não foi proclamada porque não foi possível persistir o reinado.", cancellationToken).ConfigureAwait(false);
+                return false;
+            }
+
+            announcement = $"O Imperador {reign.EmperorCharacterName}, da guild {reign.ImperialGuildName}, proclamou a {ImperialEraPresentation.GetName(era)}! {this.GetEraDescription(era)}";
         }
 
-        var previousEra = reign.SelectedEra;
-        var previousSelectedAt = reign.EraSelectedAt;
-        reign.SelectedEra = era;
-        reign.EraSelectedAt = this._timeProvider.GetUtcNow();
-        if (!await this.PersistConfigurationAsync(cancellationToken).ConfigureAwait(false))
-        {
-            reign.SelectedEra = previousEra;
-            reign.EraSelectedAt = previousSelectedAt;
-            await this._messenger.SendToPlayerAsync(player, "A Era não foi proclamada porque não foi possível persistir o reinado.", cancellationToken).ConfigureAwait(false);
-            return false;
-        }
-        await this.BroadcastAsync($"O Imperador {reign.EmperorCharacterName}, da guild {reign.ImperialGuildName}, proclamou a {ImperialEraPresentation.GetName(era)}! {this.GetEraDescription(era)}", cancellationToken).ConfigureAwait(false);
+        await this.BroadcastAsync(announcement, cancellationToken).ConfigureAwait(false);
         return true;
     }
 
@@ -673,13 +680,26 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     /// <inheritdoc />
     public async ValueTask<ValoriaSeniorInteractionResult> HandleSeniorInteractionAsync(Player player, NonPlayerCharacter npc, CancellationToken cancellationToken)
     {
-        if (npc.Definition.Number == this._options.SeniorNpcId
-            && npc.CurrentMap.Definition.Number == this._options.EventMapId
-            && this._activeReign is { SelectedEra: ImperialEra.None } reign
+        var isEventSenior = npc.Definition.Number == this._options.SeniorNpcId
+                            && npc.CurrentMap.Definition.Number == this._options.EventMapId;
+        if (isEventSenior
+            && this.State is ValoriaThroneEventState.Idle or ValoriaThroneEventState.Cooldown
+            && this._activeReign is { } reign
             && player.SelectedCharacter?.Id == reign.EmperorCharacterId)
         {
-            await this._messenger.SendToPlayerAsync(player, "Escolha a Era do reinado com /era Ascension, Fortune, Freedom ou Luck. A escolha é definitiva.", cancellationToken).ConfigureAwait(false);
-            return ValoriaSeniorInteractionResult.ConfirmationRequested;
+            if (reign.SelectedEra != ImperialEra.None)
+            {
+                await this._messenger.SendToPlayerAsync(
+                    player,
+                    $"{ImperialEraPresentation.GetName(reign.SelectedEra)} está ativa neste reinado. A escolha é definitiva.",
+                    cancellationToken).ConfigureAwait(false);
+                return ValoriaSeniorInteractionResult.Rejected;
+            }
+
+            if (this.IsEraSelectionWindowOpen(reign))
+            {
+                return ValoriaSeniorInteractionResult.EraSelectionRequested;
+            }
         }
 
         if (npc.Definition.Number == this._options.LandsOfTrials.GatekeeperNpcId
@@ -776,6 +796,25 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         return message.StartsWith("Fale", StringComparison.Ordinal)
             ? ValoriaSeniorInteractionResult.ConfirmationRequested
             : ValoriaSeniorInteractionResult.Rejected;
+    }
+
+    private bool CanSelectEra(Player player, ImperialEra era, ImperialReign? reign)
+    {
+        return ImperialEraSelectionPolicy.CanSelect(
+            reign,
+            player.SelectedCharacter?.Id,
+            era,
+            this.State,
+            this._timeProvider.GetUtcNow(),
+            this._options.ImperialEras.SelectionDuration);
+    }
+
+    private bool IsEraSelectionWindowOpen(ImperialReign reign)
+    {
+        var now = this._timeProvider.GetUtcNow();
+        return reign.StartedAt <= now
+               && reign.ExpiresAt > now
+               && reign.StartedAt.Add(this._options.ImperialEras.SelectionDuration) >= now;
     }
 
     /// <inheritdoc />

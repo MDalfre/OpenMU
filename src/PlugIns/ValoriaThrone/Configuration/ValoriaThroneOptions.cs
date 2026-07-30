@@ -32,24 +32,31 @@ public sealed class ValoriaThroneOptions
     public byte FallbackPositionY { get; set; } = 126;
 
     /// <summary>Gets or sets the announcement duration.</summary>
+    [Display(Name = "Duração do anúncio (minutos)")]
     public TimeSpan AnnouncementDuration { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>Gets or sets the preparation duration.</summary>
+    [Display(Name = "Duração da preparação (minutos)")]
     public TimeSpan PreparationDuration { get; set; }
 
     /// <summary>Gets or sets the registration duration.</summary>
+    [Display(Name = "Duração do registro (minutos)")]
     public TimeSpan RegistrationDuration { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>Gets or sets the battle duration.</summary>
+    [Display(Name = "Duração da batalha (minutos)")]
     public TimeSpan BattleDuration { get; set; } = TimeSpan.FromMinutes(30);
 
     /// <summary>Gets or sets the crown phase duration.</summary>
+    [Display(Name = "Duração da fase da coroa (minutos)")]
     public TimeSpan CrownPhaseDuration { get; set; } = TimeSpan.FromMinutes(2);
 
     /// <summary>Gets or sets the maximum time a carrier has to deliver the crown.</summary>
+    [Display(Name = "Tempo para entregar a coroa (minutos)")]
     public TimeSpan CrownDeliveryDuration { get; set; } = TimeSpan.FromMinutes(10);
 
     /// <summary>Gets or sets the delay before a lost crown returns to its original position.</summary>
+    [Display(Name = "Atraso para reaparecer a coroa (minutos)")]
     public TimeSpan CrownRespawnDelay { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>Gets or sets the item group used as temporary crown representation.</summary>
@@ -68,15 +75,18 @@ public sealed class ValoriaThroneOptions
     public short SeniorNpcId { get; set; } = 223;
 
     /// <summary>Gets or sets the time allowed for the carrier to confirm the coronation.</summary>
+    [Display(Name = "Tempo para confirmar a coroação (minutos)")]
     public TimeSpan CoronationConfirmationDuration { get; set; } = TimeSpan.FromSeconds(15);
 
     /// <summary>Gets or sets the duration of the coronation ceremony.</summary>
+    [Display(Name = "Duração da coroação (minutos)")]
     public TimeSpan CoronationDuration { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>Gets or sets the maximum distance from the Senior during the ceremony.</summary>
     public byte CoronationRadius { get; set; } = 4;
 
     /// <summary>Gets or sets the duration of a reign after a successful coronation.</summary>
+    [Display(Name = "Duração do reinado (minutos)")]
     public TimeSpan ReignDuration { get; set; } = TimeSpan.FromDays(7);
 
     /// <summary>Gets or sets the current persistent imperial reign.</summary>
@@ -90,6 +100,7 @@ public sealed class ValoriaThroneOptions
     public ValoriaImperialEraOptions ImperialEras { get; set; } = new();
 
     /// <summary>Gets or sets the cooldown duration.</summary>
+    [Display(Name = "Cooldown do evento (minutos)")]
     public TimeSpan CooldownDuration { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>Gets or sets a value indicating whether late entry is allowed.</summary>

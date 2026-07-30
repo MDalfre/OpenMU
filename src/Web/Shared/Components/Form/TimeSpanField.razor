@@ -6,12 +6,14 @@
         <FieldLabel Text="@Label" ValueExpression="@this.ValueExpression" />
         <input id="@this.FieldIdentifier.FieldName"
                type="number"
-               value="@CurrentValue.TotalMilliseconds"
+               value="@TimeSpanMinutesConverter.Format(CurrentValue)"
                class="form-control @CssClass"
                onchange="@this.OnValueChange"
-               pattern="^[0-9]+$" min="0"
-               title="@this.FieldIdentifier.FieldName in milliseconds"
-               alt="@this.FieldIdentifier.FieldName in milliseconds" />
+               min="0"
+               step="any"
+               inputmode="decimal"
+               title="@this.FieldIdentifier.FieldName in minutes"
+               alt="@this.FieldIdentifier.FieldName in minutes" />
         <ValidationMessage For=@this.ValueExpression />
     </div>
 
@@ -39,10 +41,10 @@
 
     private void OnValueChange(ChangeEventArgs args)
     {
-        if (args.Value is { } totalMilliseconds
-            && double.TryParse(totalMilliseconds!.ToString(), out var parsed))
+        if (args.Value is { } totalMinutes
+            && TimeSpanMinutesConverter.TryParse(totalMinutes.ToString(), out var parsed))
         {
-            this.CurrentValue = TimeSpan.FromMilliseconds(parsed);
+            this.CurrentValue = parsed;
         }
     }
 }
