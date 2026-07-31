@@ -645,6 +645,47 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     }
 
     /// <inheritdoc />
+    public async ValueTask<bool> HandleLandsOfTrialsEntryAsync(Player player, CancellationToken cancellationToken)
+    {
+        if (!this._options.LandsOfTrials.Enabled
+            || player.CurrentMap is not { } currentMap
+            || currentMap.Definition.Number != this._options.EventMapId
+            || !currentMap.GetNpcsInRange(player.Position, 5).Any(npc => npc.Definition.Number == this._options.LandsOfTrials.GatekeeperNpcId))
+        {
+            return false;
+        }
+
+        if (this.State is not (ValoriaThroneEventState.Idle or ValoriaThroneEventState.Cooldown))
+        {
+            await this._messenger.SendToPlayerAsync(player, "Lands of Trials não está disponível durante a batalha pelo Trono de Valoria.", cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+
+        if (!await this.CanEnterLandsOfTrialsAsync(player, cancellationToken).ConfigureAwait(false))
+        {
+            await this._messenger.SendToPlayerAsync(player, "Somente a Guild Imperial e suas alianças podem entrar em Lands of Trials.", cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+
+        var map = await player.GameContext.GetMapAsync(this._options.LandsOfTrials.MapId).ConfigureAwait(false);
+        if (map is null)
+        {
+            await this._messenger.SendToPlayerAsync(player, "Lands of Trials não está disponível neste servidor.", cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+
+        player.OpenedNpc = null;
+        if (player.PlayerState.CurrentState == PlayerState.NpcDialogOpened)
+        {
+            await player.PlayerState.TryAdvanceToAsync(PlayerState.EnteredWorld).ConfigureAwait(false);
+        }
+
+        await player.TeleportToMapAsync(map, new Point(this._options.LandsOfTrials.EntryPositionX, this._options.LandsOfTrials.EntryPositionY)).ConfigureAwait(false);
+        await this._messenger.SendToPlayerAsync(player, "A Guild Imperial controla Lands of Trials. Você recebeu permissão para entrar.", cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <inheritdoc />
     public async ValueTask<bool> SelectEraAsync(Player player, ImperialEra era, CancellationToken cancellationToken)
     {
         string announcement;
@@ -704,23 +745,11 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         }
 
         if (npc.Definition.Number == this._options.LandsOfTrials.GatekeeperNpcId
-            && this.State is ValoriaThroneEventState.Idle or ValoriaThroneEventState.Cooldown)
+            && npc.CurrentMap.Definition.Number == this._options.EventMapId)
         {
-            if (!await this.CanEnterLandsOfTrialsAsync(player, cancellationToken).ConfigureAwait(false))
-            {
-                await this._messenger.SendToPlayerAsync(player, "Somente a Guild Imperial e suas alianças podem entrar em Lands of Trials.", cancellationToken).ConfigureAwait(false);
-                return ValoriaSeniorInteractionResult.Rejected;
-            }
-
-            var map = await player.GameContext.GetMapAsync(this._options.LandsOfTrials.MapId).ConfigureAwait(false);
-            if (map is null)
-            {
-                return ValoriaSeniorInteractionResult.Rejected;
-            }
-
-            await player.TeleportToMapAsync(map, new Point(this._options.LandsOfTrials.EntryPositionX, this._options.LandsOfTrials.EntryPositionY)).ConfigureAwait(false);
-            await this._messenger.SendToPlayerAsync(player, "A Guild Imperial controla Lands of Trials. Você recebeu permissão para entrar.", cancellationToken).ConfigureAwait(false);
-            return ValoriaSeniorInteractionResult.CoronationStarted;
+            return await this.HandleLandsOfTrialsEntryAsync(player, cancellationToken).ConfigureAwait(false)
+                ? ValoriaSeniorInteractionResult.CoronationStarted
+                : ValoriaSeniorInteractionResult.Rejected;
         }
 
         if (npc.Definition.Number != this._options.SeniorNpcId || npc.CurrentMap.Definition.Number != this._options.EventMapId)

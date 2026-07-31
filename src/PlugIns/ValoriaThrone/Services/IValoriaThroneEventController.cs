@@ -56,6 +56,9 @@ public interface IValoriaThroneEventController
     /// <summary>Determines whether the player may enter Lands of Trials.</summary>
     ValueTask<bool> CanEnterLandsOfTrialsAsync(Player player, CancellationToken cancellationToken);
 
+    /// <summary>Handles an entry request made at the Lands of Trials gatekeeper.</summary>
+    ValueTask<bool> HandleLandsOfTrialsEntryAsync(Player player, CancellationToken cancellationToken);
+
     /// <summary>Selects the era for the active reign when requested by its emperor.</summary>
     ValueTask<bool> SelectEraAsync(Player player, ImperialEra era, CancellationToken cancellationToken);
 

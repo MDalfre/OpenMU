@@ -26,7 +26,7 @@ using MUnique.OpenMU.PlugIns.ValoriaThrone.Services;
 /// </summary>
 [PlugIn]
 [Guid("D066FCD8-6B7E-4A6E-8D77-F7BFB4096C1E")]
-public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugIn, IMapEntryValidationPlugIn, IAttackableGotKilledPlugIn, IObjectRemovedFromMapPlugIn, IItemPickupPlugIn, IPlayerTalkToNpcPlugIn, IPlayerStateChangedPlugIn, IExperienceRateModifierPlugIn, ICommonDropRateModifierPlugIn, IPlayerKillerWarpPolicyPlugIn, IPvpPenaltyPolicyPlugIn, IChaosSuccessRateModifierPlugIn, IJewelSuccessRateModifierPlugIn, ISupportCustomConfiguration<ValoriaThroneOptions>, ISupportDefaultCustomConfiguration
+public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugIn, IMapEntryValidationPlugIn, IAttackableGotKilledPlugIn, IObjectRemovedFromMapPlugIn, IItemPickupPlugIn, IPlayerTalkToNpcPlugIn, IPlayerStateChangedPlugIn, IExperienceRateModifierPlugIn, ICommonDropRateModifierPlugIn, IPlayerKillerWarpPolicyPlugIn, IPvpPenaltyPolicyPlugIn, IHuntingZoneEnterRequestPlugIn, IChaosSuccessRateModifierPlugIn, IJewelSuccessRateModifierPlugIn, ISupportCustomConfiguration<ValoriaThroneOptions>, ISupportDefaultCustomConfiguration
 {
     private const string Command = "/valoriathrone";
 
@@ -199,6 +199,12 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
             await player.InvokeViewPlugInAsync<IShowDialogPlugIn>(
                 plugIn => plugIn.ShowDialogAsync(ValoriaEraDialogProtocol.CommandCategory, ValoriaEraDialogProtocol.Open)).ConfigureAwait(false);
         }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask HandleHuntingZoneEnterRequestAsync(Player player, IHuntingZoneEnterRequestPlugIn.HuntingZoneEnterRequestArguments arguments)
+    {
+        arguments.Handled |= await this._controller.HandleLandsOfTrialsEntryAsync(player, CancellationToken.None).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
