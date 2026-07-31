@@ -273,7 +273,7 @@ public sealed class ValoriaThroneMapOperations : IValoriaThroneMapOperations
             area,
             configuration.Definition,
             map,
-            NullDropGenerator.Instance,
+            context.DropGenerator,
             new BasicMonsterIntelligence(),
             context.PlugInManager,
             context.PathFinderPool);
