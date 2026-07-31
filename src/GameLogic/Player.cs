@@ -1887,6 +1887,13 @@ public class Player : AsyncDisposable, IBucketMapObserver, IAttackable, IAttacke
     /// <param name="killedPlayer">The player killed.</param>
     internal async ValueTask AfterKilledPlayerAsync(Player killedPlayer)
     {
+        var pvpPenaltyArguments = new IPvpPenaltyPolicyPlugIn.PvpPenaltyArguments();
+        this.GameContext.PlugInManager.GetPlugInPoint<IPvpPenaltyPolicyPlugIn>()?.EvaluatePvpPenalty(this, killedPlayer, pvpPenaltyArguments);
+        if (pvpPenaltyArguments.IsPenaltySuppressed)
+        {
+            return;
+        }
+
         if (this.DuelRoom?.State == DuelState.DuelStarted)
         {
             return;

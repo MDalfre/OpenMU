@@ -26,7 +26,7 @@ using MUnique.OpenMU.PlugIns.ValoriaThrone.Services;
 /// </summary>
 [PlugIn]
 [Guid("D066FCD8-6B7E-4A6E-8D77-F7BFB4096C1E")]
-public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugIn, IMapEntryValidationPlugIn, IAttackableGotKilledPlugIn, IObjectRemovedFromMapPlugIn, IItemPickupPlugIn, IPlayerTalkToNpcPlugIn, IPlayerStateChangedPlugIn, IExperienceRateModifierPlugIn, ICommonDropRateModifierPlugIn, IPlayerKillerWarpPolicyPlugIn, IChaosSuccessRateModifierPlugIn, IJewelSuccessRateModifierPlugIn, ISupportCustomConfiguration<ValoriaThroneOptions>, ISupportDefaultCustomConfiguration
+public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugIn, IMapEntryValidationPlugIn, IAttackableGotKilledPlugIn, IObjectRemovedFromMapPlugIn, IItemPickupPlugIn, IPlayerTalkToNpcPlugIn, IPlayerStateChangedPlugIn, IExperienceRateModifierPlugIn, ICommonDropRateModifierPlugIn, IPlayerKillerWarpPolicyPlugIn, IPvpPenaltyPolicyPlugIn, IChaosSuccessRateModifierPlugIn, IJewelSuccessRateModifierPlugIn, ISupportCustomConfiguration<ValoriaThroneOptions>, ISupportDefaultCustomConfiguration
 {
     private const string Command = "/valoriathrone";
 
@@ -247,6 +247,19 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
     }
 
     /// <inheritdoc />
+    public void EvaluatePvpPenalty(Player attacker, Player defender, IPvpPenaltyPolicyPlugIn.PvpPenaltyArguments arguments)
+    {
+        arguments.IsPenaltySuppressed |= this._options.Enabled
+            && IsPenaltyFreePvpState(this._controller.State)
+            && this._options.EventServerId is { } eventServerId
+            && attacker.GameContext is IGameServerContext serverContext
+            && serverContext.Id == eventServerId
+            && ReferenceEquals(attacker.GameContext, defender.GameContext)
+            && ReferenceEquals(attacker.CurrentMap, defender.CurrentMap)
+            && attacker.CurrentMap?.Definition.Number == this._options.EventMapId;
+    }
+
+    /// <inheritdoc />
     public void ModifyChaosSuccessRate(Player player, IItemCraftingHandler handler, IChaosSuccessRateModifierPlugIn.ChaosSuccessRateArguments arguments)
     {
         if (this._controller.ActiveReign?.SelectedEra != ImperialEra.Luck || !this.IsLuckEnabledFor(handler))
@@ -289,6 +302,14 @@ public sealed class ValoriaThronePlugIn : IPeriodicTaskPlugIn, IChatCommandPlugI
         {
             await this._controller.StopAsync(ValoriaThroneStopReason.Failure, CancellationToken.None).ConfigureAwait(false);
         }
+    }
+
+    internal static bool IsPenaltyFreePvpState(ValoriaThroneEventState state)
+    {
+        return state is ValoriaThroneEventState.GuardianBattle
+            or ValoriaThroneEventState.CrownOnGround
+            or ValoriaThroneEventState.CrownCarried
+            or ValoriaThroneEventState.CoronationInProgress;
     }
 
     private bool IsLuckEnabledFor(IItemCraftingHandler handler)

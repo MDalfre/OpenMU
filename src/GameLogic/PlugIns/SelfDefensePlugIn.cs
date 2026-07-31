@@ -49,6 +49,13 @@ public class SelfDefensePlugIn : IPeriodicTaskPlugIn, IAttackableGotHitPlugIn, I
             return;
         }
 
+        var pvpPenaltyArguments = new IPvpPenaltyPolicyPlugIn.PvpPenaltyArguments();
+        attackerPlayer.GameContext.PlugInManager.GetPlugInPoint<IPvpPenaltyPolicyPlugIn>()?.EvaluatePvpPenalty(attackerPlayer, defender, pvpPenaltyArguments);
+        if (pvpPenaltyArguments.IsPenaltySuppressed)
+        {
+            return;
+        }
+
         if (defender.SelectedCharacter?.State >= HeroState.PlayerKiller1stStage)
         {
             // PKs have no right to self-defense.
