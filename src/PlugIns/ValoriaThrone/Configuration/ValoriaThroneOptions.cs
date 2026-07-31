@@ -52,11 +52,9 @@ public sealed class ValoriaThroneOptions
     public TimeSpan CrownPhaseDuration { get; set; } = TimeSpan.FromMinutes(2);
 
     /// <summary>Gets or sets the maximum time a carrier has to deliver the crown.</summary>
-    [Display(Name = "Tempo para entregar a coroa (minutos)")]
     public TimeSpan CrownDeliveryDuration { get; set; } = TimeSpan.FromMinutes(10);
 
     /// <summary>Gets or sets the delay before a lost crown returns to its original position.</summary>
-    [Display(Name = "Atraso para reaparecer a coroa (minutos)")]
     public TimeSpan CrownRespawnDelay { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>Gets or sets the item group used as temporary crown representation.</summary>

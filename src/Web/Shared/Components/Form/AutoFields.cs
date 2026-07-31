@@ -44,6 +44,7 @@ public class AutoFields : ComponentBase
         Builders.Add(new DateTimeFieldBuilder());
         Builders.Add(new DateOnlyFieldBuilder());
         Builders.Add(new TimeOnlyFieldBuilder());
+        Builders.Add(new ValoriaThroneDurationFieldBuilder());
         Builders.Add(new TimeSpanFieldBuilder());
         Builders.Add(new EnumFieldBuilder());
         Builders.Add(new FlagsEnumFieldBuilder());

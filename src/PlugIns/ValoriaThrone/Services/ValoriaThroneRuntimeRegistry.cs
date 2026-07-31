@@ -21,13 +21,15 @@ public sealed class ValoriaThroneRuntimeRegistry
     public bool Register(IGameServerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (this._contexts.TryGetValue(context.Id, out var registeredContext) && ReferenceEquals(registeredContext, context))
+        if (this._contexts.TryAdd(context.Id, context))
         {
-            return false;
+            return true;
         }
 
+        // A container restart recreates the context object while preserving its server id.
+        // Keep the current context, but don't report that normal replacement as a new registration.
         this._contexts[context.Id] = context;
-        return true;
+        return false;
     }
 
     /// <summary>

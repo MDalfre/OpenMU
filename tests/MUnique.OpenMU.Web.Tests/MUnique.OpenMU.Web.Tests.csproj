@@ -48,5 +48,6 @@
     <ProjectReference Include="..\..\src\DataModel\MUnique.OpenMU.DataModel.csproj" />
     <ProjectReference Include="..\..\src\Interfaces\MUnique.OpenMU.Interfaces.csproj" />
     <ProjectReference Include="..\..\src\GameLogic\MUnique.OpenMU.GameLogic.csproj" />
+    <ProjectReference Include="..\..\src\PlugIns\ValoriaThrone\MUnique.OpenMU.PlugIns.ValoriaThrone.csproj" />
   </ItemGroup>
 </Project>
