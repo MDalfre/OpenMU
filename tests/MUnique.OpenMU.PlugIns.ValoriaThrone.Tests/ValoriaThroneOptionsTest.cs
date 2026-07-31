@@ -7,6 +7,7 @@ namespace MUnique.OpenMU.PlugIns.ValoriaThrone.Tests;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using MUnique.OpenMU.DataModel.Composition;
+using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Configuration;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Domain;
 using MUnique.OpenMU.PlugIns.ValoriaThrone.Services;
@@ -67,5 +68,21 @@ public class ValoriaThroneOptionsTest
         Assert.That(ValoriaThroneEventController.ValoriaEmperorStatusId, Is.EqualTo(173));
         Assert.That(ValoriaThroneEventController.ValoriaEmperorStatusId, Is.Not.EqualTo(20));
         Assert.That(ValoriaThroneEventController.ValoriaEmperorStatusId, Is.Not.EqualTo(28));
+    }
+
+    /// <summary>
+    /// Ensures the Valoria status effects can be sent to the client without a null power-up collection.
+    /// </summary>
+    /// <param name="fieldName">The status definition field name.</param>
+    [TestCase("CrownCarrierStatusDefinition")]
+    [TestCase("ValoriaEmperorStatusDefinition")]
+    public void ValoriaStatusEffectHasAnEmptyPowerUpCollection(string fieldName)
+    {
+        var field = typeof(ValoriaThroneEventController).GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Static)
+                    ?? throw new InvalidOperationException($"{fieldName} was not found.");
+        var definition = field.GetValue(null) as MagicEffectDefinition
+                         ?? throw new InvalidOperationException($"{fieldName} contains no magic effect definition.");
+
+        Assert.That(definition.PowerUpDefinitions, Is.Empty);
     }
 }

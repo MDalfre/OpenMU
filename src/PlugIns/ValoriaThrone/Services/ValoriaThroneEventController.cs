@@ -5,6 +5,7 @@
 namespace MUnique.OpenMU.PlugIns.ValoriaThrone.Services;
 
 using Microsoft.Extensions.Logging;
+using MUnique.OpenMU.DataModel.Attributes;
 using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.GameLogic;
 using MUnique.OpenMU.GameLogic.NPC;
@@ -25,7 +26,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
     /// <summary>The client status id reserved for the Valoria emperor.</summary>
     public const short ValoriaEmperorStatusId = 173;
 
-    private static readonly MagicEffectDefinition CrownCarrierStatusDefinition = new()
+    private static readonly MagicEffectDefinition CrownCarrierStatusDefinition = new ValoriaStatusMagicEffectDefinition
     {
         Number = CrownCarrierStatusId,
         InformObservers = true,
@@ -33,7 +34,7 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
         SendDuration = false,
     };
 
-    private static readonly MagicEffectDefinition ValoriaEmperorStatusDefinition = new()
+    private static readonly MagicEffectDefinition ValoriaEmperorStatusDefinition = new ValoriaStatusMagicEffectDefinition
     {
         Number = ValoriaEmperorStatusId,
         InformObservers = true,
@@ -1213,5 +1214,13 @@ public sealed class ValoriaThroneEventController : IValoriaThroneEventController
             return;
         }
         await this.BroadcastAsync($"O prazo de escolha terminou. {ImperialEraPresentation.GetName(reign.SelectedEra)} foi proclamada automaticamente. {this.GetEraDescription(reign.SelectedEra)}", cancellationToken).ConfigureAwait(false);
+    }
+
+    private sealed class ValoriaStatusMagicEffectDefinition : MagicEffectDefinition
+    {
+        public ValoriaStatusMagicEffectDefinition()
+        {
+            this.PowerUpDefinitions = new List<PowerUpDefinition>(0);
+        }
     }
 }
