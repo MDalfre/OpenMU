@@ -15,6 +15,14 @@ public enum UpdateVersion
     /// </summary>
     Undefined = 0,
 
+    // Values from 10000 onwards are reserved for custom updates maintained by this fork.
+    // Keep upstream OpenMU updates in their original sequence below this range.
+
+    /// <summary>
+    /// The version of the <see cref="SetValoriaDestroyedKingNamePlugIn"/>.
+    /// </summary>
+    SetValoriaDestroyedKingName = 10000,
+
     /// <summary>
     /// The version of the <see cref="ChaosCastleDataUpdatePlugIn"/>.
     /// </summary>
@@ -504,10 +512,4 @@ public enum UpdateVersion
     /// The version of the <see cref="AddRenaItemUpdatePlugIn"/>.
     /// </summary>
     AddRenaItem = 99,
-
-    /// <summary>
-    /// The version of the <see cref="SetValoriaDestroyedKingNamePlugIn"/>.
-    /// Custom update versions start at 10000 to avoid collisions with upstream OpenMU updates.
-    /// </summary>
-    SetValoriaDestroyedKingName = 10000,
 }
