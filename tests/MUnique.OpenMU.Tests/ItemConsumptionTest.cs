@@ -89,7 +89,7 @@ public class ItemConsumptionTest
     public async ValueTask JewelOfSoulAsync(byte itemLevel, bool consumptionExpectation, bool success, byte expectedItemLevel)
     {
         var randomizer = new Mock<IRandomizer>();
-        randomizer.Setup(r => r.NextRandomBool(50)).Returns(success);
+        randomizer.Setup(r => r.NextRandomBool(0.5)).Returns(success);
         var consumeHandler = new SoulJewelConsumeHandlerPlugIn(randomizer.Object);
 
         var player = await this.GetPlayerAsync().ConfigureAwait(false);

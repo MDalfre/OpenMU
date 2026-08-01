@@ -4,11 +4,14 @@
 
 namespace MUnique.OpenMU.Web.Tests;
 
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Moq;
 using MUnique.OpenMU.DataModel.Configuration;
 using MUnique.OpenMU.Persistence;
 using MUnique.OpenMU.Web.Shared.Services;
+using PersistentGameConfiguration = MUnique.OpenMU.Persistence.BasicModel.GameConfiguration;
+using PersistentSkill = MUnique.OpenMU.Persistence.BasicModel.Skill;
 
 /// <summary>
 /// Tests the lookup used by optional skill-reference fields such as Monster.AttackSkill.
@@ -21,9 +24,9 @@ public class PersistentObjectsLookupControllerTest
     [Test]
     public async Task EmptySearchReturnsCurrentGameConfigurationSkills()
     {
-        var currentSkill = new Skill { Number = 42, Name = "Death Stab" };
-        var anotherSkill = new Skill { Number = 9, Name = "Evil Spirit" };
-        var configuration = new GameConfiguration();
+        var currentSkill = new PersistentSkill { Number = 42, Name = "Death Stab" };
+        var anotherSkill = new PersistentSkill { Number = 9, Name = "Evil Spirit" };
+        var configuration = new PersistentGameConfiguration();
         configuration.Skills.Add(currentSkill);
         configuration.Skills.Add(anotherSkill);
         var controller = CreateController(configuration);
@@ -40,11 +43,11 @@ public class PersistentObjectsLookupControllerTest
     [Test]
     public async Task SearchMatchesSkillNumberAndName()
     {
-        var deathStab = new Skill { Number = 42, Name = "Death Stab" };
-        var configuration = new GameConfiguration();
+        var deathStab = new PersistentSkill { Number = 42, Name = "Death Stab" };
+        var configuration = new PersistentGameConfiguration();
         configuration.Skills.Add(deathStab);
-        configuration.Skills.Add(new Skill { Number = 9, Name = "Evil Spirit" });
-        configuration.Skills.Add(new Skill { Number = 250, Name = string.Empty });
+        configuration.Skills.Add(new PersistentSkill { Number = 9, Name = "Evil Spirit" });
+        configuration.Skills.Add(new PersistentSkill { Number = 250, Name = string.Empty });
         var controller = CreateController(configuration);
 
         var byNumber = await controller.GetSuggestionsAsync<Skill>("42", null);
@@ -65,7 +68,7 @@ public class PersistentObjectsLookupControllerTest
     [Test]
     public async Task ConfigurationWithoutSkillsReturnsEmptyList()
     {
-        var controller = CreateController(new GameConfiguration());
+        var controller = CreateController(new PersistentGameConfiguration());
 
         var result = await controller.GetSuggestionsAsync<Skill>(null, null);
 

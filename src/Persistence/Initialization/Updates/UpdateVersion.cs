@@ -496,7 +496,18 @@ public enum UpdateVersion
     FinishElfMasterTree = 97,
 
     /// <summary>
-    /// The version of the <see cref="SetValoriaDestroyedKingNamePlugIn"/>.
+    /// The version of the <see cref="AddItemRegistrationAttributesUpdatePlugIn"/>.
     /// </summary>
-    SetValoriaDestroyedKingName = 98,
+    AddItemRegistrationAttributes = 98,
+
+    /// <summary>
+    /// The version of the <see cref="AddRenaItemUpdatePlugIn"/>.
+    /// </summary>
+    AddRenaItem = 99,
+
+    /// <summary>
+    /// The version of the <see cref="SetValoriaDestroyedKingNamePlugIn"/>.
+    /// Custom update versions start at 10000 to avoid collisions with upstream OpenMU updates.
+    /// </summary>
+    SetValoriaDestroyedKingName = 10000,
 }
