@@ -23,7 +23,7 @@ public static class ImperialEraPresentation
     public static string GetDescription(ImperialEra era, ValoriaImperialEraOptions options) => era switch
     {
         ImperialEra.Ascension => $"Experiência global aumentada em {FormatBonus(options.AscensionExperienceMultiplier)}.",
-        ImperialEra.Fortune => $"Taxa de drop comum aumentada em {FormatBonus(options.FortuneDropMultiplier)}.",
+        ImperialEra.Fortune => $"Taxa de drop aumentada em {FormatBonus(options.FortuneDropMultiplier)}.",
         ImperialEra.Freedom => "Personagens PK podem utilizar teleportes normais entre mapas.",
         ImperialEra.Luck => $"Chances da Chaos Machine aumentadas em {FormatBonus(options.LuckChaosMachineMultiplier)} e das joias em {FormatBonus(options.LuckJewelMultiplier)}.",
         _ => "O Imperador ainda não proclamou uma Era.",
