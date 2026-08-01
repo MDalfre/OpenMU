@@ -4627,11 +4627,13 @@ namespace MUnique.OpenMU.Persistence.EntityFramework.Migrations
                 {
                     b.HasOne("MUnique.OpenMU.Persistence.EntityFramework.Model.Character", "RawCharacter")
                         .WithMany()
-                        .HasForeignKey("CharacterId");
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("MUnique.OpenMU.Persistence.EntityFramework.Model.MiniGameDefinition", "RawMiniGame")
                         .WithMany()
-                        .HasForeignKey("MiniGameId");
+                        .HasForeignKey("MiniGameId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("RawCharacter");
 
